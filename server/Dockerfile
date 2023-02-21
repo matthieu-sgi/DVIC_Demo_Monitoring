@@ -14,5 +14,5 @@ RUN pip install --trusted-host pypi.python.org -r requirements.txt
 
 # Launch the api using uvicorn
 
-CMD ["uvicorn", "dvic_log_server/api:app", "--host", "0.0.0.0", "--port", "92400"]
+CMD ["uvicorn", "dvic_log_server.api:app", "--host", "0.0.0.0", "--port", "9240"]
 

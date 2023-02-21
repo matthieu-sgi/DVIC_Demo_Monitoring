@@ -24,6 +24,7 @@ manager = ConnectionManager()
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
+    print(f'New connection from {websocket.client.host}:{websocket.client.port}')
     try:
         # Log the connection into the log file
         with open(os.path.join(os.path.dirname(__file__), '.logs/websockets_connection.log'), 'a') as log_file:
