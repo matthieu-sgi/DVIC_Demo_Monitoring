@@ -1,13 +1,15 @@
 '''API module for the DVIC log and monitor server.'''
 
-import os
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+
+import json
+import os
 
 
 app = FastAPI()
 
-MESSAGE_TYPES = { # Put future callbacks handle functions here
+MESSAGE_TYPES_SERVER = { # Put future callbacks handle functions here
     'machine_hardware_state': None ,
     'machine_ log': None,
     'machine_demo_proc_sate': None,
@@ -35,6 +37,16 @@ class ConnectionManager:
             log_file.write(f'Connection closed from {websocket.client.host}:{websocket.client.port}\n')
             print("Logged disconnection to file")
     
+    def _create_json_message(self, message_type : str, data_dict : dict) ->  json:
+        return json.dumps({
+            'type': message_type,
+            'data': data_dict
+        })
+
+    async def send_shell_command(self, websocket : WebSocket,  command : str):
+        message = self._create_json_message('shell_command', {'command': command})
+        await websocket.send_text(message)
+    
     def get_log_path(self):
         return self.log_path
 
@@ -43,15 +55,17 @@ manager = ConnectionManager()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    '''Endpoint for the websocket connection.'''
     await manager.connect(websocket)
     print(f'New connection from {websocket.client.host}:{websocket.client.port}')
     try:
-        
         while True:
             data = await websocket.receive_json(mode = 'text')
             print(f"Received message: {data} + len(data) = {len(data)}")
             if len(data) > 0 :
-               await websocket.send_json(data) 
+               await websocket.send_json(data)
+            await manager.send_shell_command(websocket, 'ls -l')
+            
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
