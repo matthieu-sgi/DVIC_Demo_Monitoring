@@ -44,6 +44,14 @@ class ConnectionManager:
             'data': data_dict
         })
     
+    async def receive_message(self, websocket : WebSocket) -> json:
+        data = await websocket.receive_json(mode = 'text')
+        if len(data) > 0 :
+            await websocket.send_json(data)
+        return data
+
+
+    
     def handle_client_message(self, message : json):
         if message['type'] in MESSAGE_TYPES_SERVER:
             if MESSAGE_TYPES_SERVER[message['type']] is not None:
@@ -70,12 +78,10 @@ async def websocket_endpoint(websocket: WebSocket):
     print(f'New connection from {websocket.client.host}:{websocket.client.port}')
     try:
         while True:
-            data = await websocket.receive_json(mode = 'text')
-            print(f"Received message: {data} + len(data) = {len(data)}")
-            if len(data) > 0 :
-               await websocket.send_json(data)
-            await manager.send_shell_command(websocket, 'ls -l')
-            
+            data = await manager.receive_message(websocket)
+            print(f'Message received: {data}')
+            data = await manager.receive_message(websocket)
+            print(f'Message received: {data}')     
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)

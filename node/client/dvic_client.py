@@ -19,15 +19,15 @@ class DVICClient:
     def send_str(self, message : str):
         self.ws.send(message)
 
-    def send_json(self, message : dict):
+    def send_json(self, message : dict) -> int:
         self.ws.send(message)
         response = self.ws.recv()
         while response != message:
-            print(f'Error: Message received: {response}')
+            # print(f'Error: Message received: {response}')
             self.ws.send(message)
             response = self.ws.recv()
-
-        print(f'Message received: {response}')
+        return 1
+        # print(f'Message received: {response}')
 
 
     def create_json_message(self, message_type : str, data_dict : dict) -> json:
@@ -95,7 +95,7 @@ class DVICClient:
         mem_total = meminfo['MemTotal']
         mem_free = meminfo['MemFree']
         mem_available = meminfo['MemAvailable']
-        mem_used = 100 * (1.0 - (float)(mem_available / mem_total))
+        mem_used = round(100 * (1.0 - (float)(mem_available / mem_total)), 2)
         memory_info = {
             'total': mem_total,
             'free': mem_free,
@@ -104,11 +104,7 @@ class DVICClient:
         }
         data["memory_info"] = memory_info
 
-
-
-
-
-        
+        return self.create_json_message('machine_hardware_state', data)       
 
 
 
@@ -148,7 +144,7 @@ if __name__ == '__main__':
         print('Sending data...')
         message = client.create_json_message('machine_hardware_state', {'test': 'test'})
         client.send_json(message)
-        client.handle_server_message()
+        client.send_json(client.get_machine_hardware_info())
         print('Message sent.')
         input('Press enter to close connection...')
         print('Closing connection...')
