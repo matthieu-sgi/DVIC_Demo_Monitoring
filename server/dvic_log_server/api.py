@@ -4,16 +4,17 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 
 import json
+import dvic_log_server.message_handler as message_handler
 import os
 
 
 app = FastAPI()
 
 MESSAGE_TYPES_SERVER = { # Put future callbacks handle functions here
-    'machine_hardware_state': None ,
-    'machine_ log': None,
-    'machine_demo_proc_sate': None,
-    'machine_demo_log': None
+    'machine_hardware_state': message_handler.machine_hardware_state,
+    'machine_ log': message_handler.machine_log,
+    'machine_demo_proc_sate': message_handler.machine_demo_proc_state,
+    'machine_demo_log': message_handler.machine_demo_log,
 }
 
 class ConnectionManager:
@@ -42,6 +43,15 @@ class ConnectionManager:
             'type': message_type,
             'data': data_dict
         })
+    
+    def handle_client_message(self, message : json):
+        if message['type'] in MESSAGE_TYPES_SERVER:
+            if MESSAGE_TYPES_SERVER[message['type']] is not None:
+                MESSAGE_TYPES_SERVER[message['type']](message['data'])
+            else:
+                print(f'No callback function for message type {message["type"]}')
+        else:
+            print(f'Unknown message type {message["type"]}')
 
     async def send_shell_command(self, websocket : WebSocket,  command : str):
         message = self._create_json_message('shell_command', {'command': command})

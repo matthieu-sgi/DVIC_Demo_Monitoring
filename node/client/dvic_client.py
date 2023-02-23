@@ -1,7 +1,6 @@
 '''Client for the DVIC log server. Run as system service on the DVIC node.'''
 from __future__ import annotations
 
-import asyncio
 import json
 import subprocess
 
@@ -47,7 +46,6 @@ class DVICClient:
     def handle_server_message(self):
         message = self.receive_json()
         print(f'Message received: {message}')
-        print(type(message) )
         if message['type'] in MESSAGE_TYPES_CLIENT:
             if MESSAGE_TYPES_CLIENT[message['type']] is not None:
                 MESSAGE_TYPES_CLIENT[message['type']](message['data'])
@@ -80,10 +78,6 @@ class DVICClient:
 
 MESSAGE_TYPES_CLIENT = { # Put future callbacks handle functions here
     # For the client, the message types are likely to change
-    'machine_hardware_state': None ,
-    'machine_ log': None,
-    'machine_demo_proc_sate': None,
-    'machine_demo_log': None,
     'shell_command': DVICClient.execute_shell_command
 }
 
