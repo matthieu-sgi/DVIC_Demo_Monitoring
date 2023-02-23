@@ -54,6 +54,12 @@ The API exposes states for dashboard display.
 
 TDB #TODO
 
+- Machine hardware State (temp, cpu, id, memory, disk, number of procs etc)
+- Machine log (system logs)
+- Machine demo proc state (Is Alive ?)
+- Machine demo logs (each time a log is written, send it to central server)
+
+
 ## Roadmap
 
 ### Network
