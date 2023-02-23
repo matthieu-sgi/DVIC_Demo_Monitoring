@@ -2,11 +2,7 @@
 Description=dvic demo watcher service
 After=network.target
 Requires=network.target
-Type=oneshot
+Type=simple
 Restart=always
-RestartSec=1
 User=root
 ExecStart=/opt/dvic-demo-watcher/dvic_client.py
-
-[Install]
-WantedBy=multi-user.target

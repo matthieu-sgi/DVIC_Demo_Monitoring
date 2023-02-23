@@ -54,16 +54,63 @@ class DVICClient:
         else:
             print(f'Unknown message type {message["type"]}')
 
-    @staticmethod
-    def execute_shell_command(data : dict):
-        '''Execute a shell command on the DVIC node.'''
-        command = data['command']
-        print(f'Executing shell command: {command}')
-        with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-            for line in process.stdout:
-                print(line)
-            for line in process.stderr:
-                print(line)
+    def get_machine_hardware_info(self):
+        # Get system temperature
+        counter = 0
+        data = {}
+
+        # Machine name 
+        with open('/etc/hostname', 'r') as f:
+            data["machine_name"] = f.read().strip()
+        
+        # Machine IP address ## Has to be fixed, only display the local IP address
+        with open('/etc/hosts', 'r') as f:
+            data["machine_ip"] = f.read().split()[0]
+
+
+        temps = {}
+        while True :
+            try:
+                temp_name = ''
+                temp_temp = 0
+                with open(f'/sys/class/thermal/thermal_zone{counter}/type', 'r') as type_file:
+                    temp_name = type_file.read().strip()
+                with open(f'/sys/class/thermal/thermal_zone{counter}/temp', 'r') as temp_file:
+                    temp_temp = float(temp_file.read()) / 1000
+                temps[temp_name] = temp_temp
+                counter += 1
+            except FileNotFoundError:
+                break
+        data["temperature"] = temps
+        
+        with open('/proc/stat') as f:
+            fields = [float(column) for column in f.readline().strip().split()[1:]]
+        idle, total = fields[3], sum(fields)
+        cpu_usage = 100 * (1.0 - (float)(idle / total))
+        data["cpu_usage"] = cpu_usage
+
+        # Get system memory
+        with open('/proc/meminfo') as f:
+            meminfo = dict((i.split()[0].rstrip(':'), int(i.split()[1])) for i in f.readlines())
+        mem_total = meminfo['MemTotal']
+        mem_free = meminfo['MemFree']
+        mem_available = meminfo['MemAvailable']
+        mem_used = 100 * (1.0 - (float)(mem_available / mem_total))
+        memory_info = {
+            'total': mem_total,
+            'free': mem_free,
+            'available': mem_available,
+            'used': mem_used
+        }
+        data["memory_info"] = memory_info
+
+
+
+
+
+        
+
+
 
     
     def close(self):
@@ -75,6 +122,17 @@ class DVICClient:
     
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    @staticmethod
+    def execute_shell_command(data : dict):
+        '''Execute a shell command on the DVIC node.'''
+        command = data['command']
+        print(f'Executing shell command: {command}')
+        with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+            for line in process.stdout:
+                print(line)
+            for line in process.stderr:
+                print(line)
 
 MESSAGE_TYPES_CLIENT = { # Put future callbacks handle functions here
     # For the client, the message types are likely to change

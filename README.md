@@ -52,8 +52,9 @@ The API exposes states for dashboard display.
 
 ## Protocol
 
-TDB #TODO
+Information is sent in JSON format.
 
+Information types:
 - Machine hardware State (temp, cpu, id, memory, disk, number of procs etc)
 - Machine log (system logs)
 - Machine demo proc state (Is Alive ?)
