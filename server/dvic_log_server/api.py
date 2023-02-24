@@ -4,17 +4,17 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 
 import json
-import dvic_log_server.message_handler as message_handler
+import server.dvic_log_server.handler as handler
 import os
 
 
 app = FastAPI()
 
 MESSAGE_TYPES_SERVER = { # Put future callbacks handle functions here
-    'machine_hardware_state': message_handler.machine_hardware_state,
-    'machine_ log': message_handler.machine_log,
-    'machine_demo_proc_sate': message_handler.machine_demo_proc_state,
-    'machine_demo_log': message_handler.machine_demo_log,
+    'machine_hardware_state': handler.machine_hardware_state,
+    'machine_ log': handler.machine_log,
+    'machine_demo_proc_sate': handler.machine_demo_proc_state,
+    'machine_demo_log': handler.machine_demo_log,
 }
 
 class ConnectionManager:

@@ -1,5 +1,5 @@
 [Unit]
-Description=dvic demo watcher service
+Description=DVIC demo watcher service
 After=network.target
 Requires=network.target
 Type=simple

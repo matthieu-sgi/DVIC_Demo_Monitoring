@@ -7,8 +7,6 @@ import subprocess
 from websocket import create_connection
 
 
-
-
 class DVICClient:
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
     def __init__(self, host, port):
@@ -105,14 +103,6 @@ class DVICClient:
         data["memory_info"] = memory_info
 
 
-
-
-
-        
-
-
-
-    
     def close(self):
         self.ws.close(status=1000, reason='Client closed connection.')
     
