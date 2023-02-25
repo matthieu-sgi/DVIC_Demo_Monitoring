@@ -1,10 +1,12 @@
 '''Client for the DVIC log server. Run as system service on the DVIC node.'''
 
 import json
+import os
 import subprocess
 
 from websocket import create_connection
 
+path = f'/tmp/dvic_demo_log_fifo'
 
 class DVICClient:
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
@@ -113,6 +115,8 @@ class DVICClient:
         stdout, stderr = None, None
         with subprocess.Popen('ps -A | grep demo', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
+
+        # TO DO : Check if the demo process is running, return the state of the demo process (IS_ALIVE, IS_DEAD, IS_NOT_RUNNING)
         
         return [stdout.decode('utf-8'), stderr.decode('utf-8')]
 
@@ -140,6 +144,12 @@ class DVICClient:
         with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
         return self.create_json_message('shell_command_response', {'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')})
+    
+    def get_demo_logs():
+        '''Get the logs of the demo process.'''
+        # Verify if the fifo file exists
+        if not os.path.exists('/tmp/dvic_log_fifo'):
+            return self.create_json_message('demo_logs_response', {'logs': 'No logs available.'})
 
 
 

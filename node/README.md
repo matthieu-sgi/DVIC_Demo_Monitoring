@@ -10,3 +10,4 @@ The node functions are described in the [general readme](../README.md)
 
 - [ ] Auto-update python script
 - [ ] Send back the result of a command
+- [ ] Is the node alive ?
