@@ -59,20 +59,21 @@ Information types:
 - Machine log (system logs)
 - Machine demo proc state (Is Alive ?)
 - Machine demo logs (each time a log is written, send it to central server)
+- Shell command response (when a command is sent to a node, send back the result)
 
 
 ## Roadmap
 
 ### Network
 
-- [ ] Websocket from node to central server
+- [x] Websocket from node to central server
 - [ ] Bring back online the connection.
-- [ ] Define communication protocol
+- [x] Define communication protocol
 
 ### Node
 
-- [ ] Execute command received from central server
-- [ ] Send data to central server
+- [x] Execute command received from central server
+- [x] Send data to central server
 - [ ] Gather data from hardware and soft sources (syslog, t° etc)
 - [ ] Read log files from /tmp
 - [ ] Inspect docker containers and read /tmp from there
@@ -81,10 +82,10 @@ Information types:
 
 ### Central Server & Dashboard
 
-- [ ] Receive data from nodes
+- [x] Receive data from nodes
 - [ ] Keep state history of metrics
 - [ ] Choose database for log
-- [ ] Choose log format
+- [x] Choose log format
 - [ ] Keep log history in database 
 - [ ] Expose API for dashboard (node state, last logs etc)
 - [ ] Terminal session from dashboard
@@ -94,7 +95,7 @@ Information types:
 - [ ] Library writes to /tmp
 - [ ] Implement log format with log level
 - [ ] Write PID or other info on the first line (pid, exec, user etc)
-- [ ] Deploy artifatcs
+- [ ] Deploy artifacts
 
 ### Quality Check
 

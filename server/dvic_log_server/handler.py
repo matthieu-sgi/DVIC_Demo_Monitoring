@@ -1,5 +1,5 @@
 '''Python module for handling messages from the client.'''
-from dvic_log_server.network.packets import HardwareState, LogEntry, DemoProcState, InteractiveSession as InteractiveSessionPacket
+from server.dvic_log_server.network.packets import HardwareState, ShellCommandResponse, LogEntry, DemoProcState, InteractiveSession as InteractiveSessionPacket
 import os
 
 
@@ -15,6 +15,10 @@ def demo_proc_state(data : DemoProcState):
     '''Handle the machine demo process state message.'''
     print(f'Machine demo process state: {data}')
 
+def shell_command_response(data : ShellCommandResponse):
+    '''Handle the machine shell command response message.'''
+    print(f'Machine shell command response: {data}')
+
 def handle_interactive_session_packet(pck: InteractiveSessionPacket):
     #TODO:
     # if interactive session does not exist
@@ -25,7 +29,7 @@ def handle_interactive_session_packet(pck: InteractiveSessionPacket):
     # if this is ret_value (final) packet
     #   kill session, remove session, return
     # push data normally
-
+    pass
 
 
 

@@ -60,35 +60,49 @@ class Packet:
         raise NotImplementedError()    
 
 class HardwareState(Packet):
-    def __init__(self,) -> None:
+    def __init__(self, data : dict) -> None:
         super().__init__("hardware_state")
+        self.data = data
 
     def get_data(self) -> dict:
-        return {}
+        return self.data
     
     def set_data(self, data: dict) -> None:
-        pass
+        self.data = data
 
 class LogEntry(Packet):
-    def __init__(self) -> None:
+    def __init__(self, data : dict) -> None:
         super().__init__("log_entry")
+        self.data = data
 
     def get_data(self) -> dict:
-        return {}
+        return self.data
 
     def set_data(self, data: dict) -> None:
-        pass
+        self.data = data
 
 
 class DemoProcState(Packet):
-    def __init__(self) -> None:
+    def __init__(self, data : dict) -> None:
         super().__init__("demo_proc_state")
+        self.data = data
 
     def get_data(self) -> dict:
-        return {}
+        return self.data
     
     def set_data(self, data: dict) -> None:
-        pass
+        self.data = data
+
+class ShellCommandResponse(Packet):
+    def __init__(self, data : dict) -> None:
+        super().__init__("shell_command_response")
+        self.data = data
+
+    def get_data(self) -> dict:
+        return self.data
+    
+    def set_data(self, data: dict) -> None:
+        self.data = data
 
 
 class InteractiveSession(Packet):

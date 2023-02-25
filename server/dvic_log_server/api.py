@@ -11,10 +11,11 @@ import os
 app = FastAPI()
 
 MESSAGE_TYPES_SERVER = { # Put future callbacks handle functions here
-    'machine_hardware_state': handler.machine_hardware_state,
-    'machine_ log': handler.machine_log,
-    'machine_demo_proc_sate': handler.machine_demo_proc_state,
-    'machine_demo_log': handler.machine_demo_log,
+    'machine_hardware_state': handler.hardware_state,
+    'machine_ log': handler.log,
+    'machine_demo_proc_sate': handler.demo_proc_state,
+    'shell_command_response': handler.shell_command_response,
+    # 'machine_demo_log': handler.demo_log,
 }
 
 class ConnectionManager:
@@ -79,9 +80,12 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await manager.receive_message(websocket)
-            print(f'Message received: {data}')
-            data = await manager.receive_message(websocket)
-            print(f'Message received: {data}')     
+            manager.handle_client_message(data)
+            # data = await manager.receive_message(websocket)
+            # print(f'Message received: {data}')
+            await manager.send_shell_command(websocket, 'ls')
+            response = await manager.receive_message(websocket)
+            manager.handle_client_message(response)
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)

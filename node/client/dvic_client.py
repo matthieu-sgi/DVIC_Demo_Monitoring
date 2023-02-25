@@ -1,5 +1,4 @@
 '''Client for the DVIC log server. Run as system service on the DVIC node.'''
-from __future__ import annotations
 
 import json
 import subprocess
@@ -13,6 +12,10 @@ class DVICClient:
         self.host = host
         self.port = port
         self.ws = None
+        self.MESSAGE_TYPES_CLIENT = { # Put future callbacks handle functions here
+        # For the client, the message types are likely to change
+        'shell_command': self.execute_shell_command
+        }
     
     def send_str(self, message : str):
         self.ws.send(message)
@@ -44,9 +47,9 @@ class DVICClient:
     def handle_server_message(self):
         message = self.receive_json()
         print(f'Message received: {message}')
-        if message['type'] in MESSAGE_TYPES_CLIENT:
-            if MESSAGE_TYPES_CLIENT[message['type']] is not None:
-                MESSAGE_TYPES_CLIENT[message['type']](message['data'])
+        if message['type'] in self.MESSAGE_TYPES_CLIENT:
+            if self.MESSAGE_TYPES_CLIENT[message['type']] is not None:
+                self.send_json(self.MESSAGE_TYPES_CLIENT[message['type']](message['data']))
             else:
                 print(f'No callback function for message type {message["type"]}')
         else:
@@ -84,7 +87,7 @@ class DVICClient:
         with open('/proc/stat') as f:
             fields = [float(column) for column in f.readline().strip().split()[1:]]
         idle, total = fields[3], sum(fields)
-        cpu_usage = 100 * (1.0 - (float)(idle / total))
+        cpu_usage = round(100 * (1.0 - (float)(idle / total)), 2)
         data["cpu_usage"] = cpu_usage
 
         # Get system memory
@@ -101,6 +104,18 @@ class DVICClient:
             'used': mem_used
         }
         data["memory_info"] = memory_info
+        return self.create_json_message("machine_hardware_state",data)
+    
+    def get_machine_software_info(self):
+        '''Get the software information of the DVIC node (demo proc IsAlive).'''
+
+        # Fetch the state of the demo process
+        stdout, stderr = None, None
+        with subprocess.Popen('ps -A | grep demo', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+            stdout, stderr = process.communicate()
+        
+        return [stdout.decode('utf-8'), stderr.decode('utf-8')]
+
 
     def close(self):
         self.ws.close(status=1000, reason='Client closed connection.')
@@ -112,34 +127,38 @@ class DVICClient:
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    @staticmethod
-    def execute_shell_command(data : dict):
+
+
+
+
+    
+    def execute_shell_command(self, data : dict):
         '''Execute a shell command on the DVIC node.'''
         command = data['command']
         print(f'Executing shell command: {command}')
+        stdout, stderr = None, None
         with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-            for line in process.stdout:
-                print(line)
-            for line in process.stderr:
-                print(line)
+            stdout, stderr = process.communicate()
+        return self.create_json_message('shell_command_response', {'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')})
 
-MESSAGE_TYPES_CLIENT = { # Put future callbacks handle functions here
-    # For the client, the message types are likely to change
-    'shell_command': DVICClient.execute_shell_command
-}
+
 
 
 if __name__ == '__main__':  
    with DVICClient('0.0.0.0', 9240) as client:
 
-        print('Connected to DVIC log server.')
-        input('Press enter to send json...')
-        print('Sending data...')
-        message = client.create_json_message('machine_hardware_state', {'test': 'test'})
-        client.send_json(message)
-        client.send_json(client.get_machine_hardware_info())
-        print('Message sent.')
-        input('Press enter to close connection...')
-        print('Closing connection...')
+        # print('Connected to DVIC log server.')
+        # input('Press enter to send json...')
+        # print('Sending data...')
+        # # message = client.create_json_message('machine_hardware_state', {'test': 'test'})
+        # # client.send_json(message)
+        # print(client.get_machine_hardware_info())
+        # input('Press enter to send json...')
+        # client.send_json(client.get_machine_hardware_info())
+        # print('Message sent.')
+        # client.handle_server_message()
+        # input('Press enter to close connection...')
+        # print('Closing connection...')
+        print(client.get_machine_software_info())
 
     
