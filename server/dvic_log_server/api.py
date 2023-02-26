@@ -1,93 +1,82 @@
 '''API module for the DVIC log and monitor server.'''
 
+import traceback
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-
+import uuid
 import json
-import server.dvic_log_server.handler as handler
+import asyncio
 import os
+
+from dvic_log_server.connection import Connection
+from dvic_log_server.network.packets import Packet, decode as decode_packet
+from dvic_log_server.utils import singleton
 
 
 app = FastAPI()
 
-MESSAGE_TYPES_SERVER = { # Put future callbacks handle functions here
-    'machine_hardware_state': handler.hardware_state,
-    'machine_ log': handler.log,
-    'machine_demo_proc_sate': handler.demo_proc_state,
-    'shell_command_response': handler.shell_command_response,
-    # 'machine_demo_log': handler.demo_log,
-}
 
+
+@singleton
 class ConnectionManager:
     def __init__(self):
-        self.active_connections = []
+        self.connections = {}
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         #remove the 'dvic_log_server' part of the path
         self.log_path = self.log_path[:self.log_path.rfind('/')]
-        self.log_path = os.path.join(self.log_path, '.logs/websockets_connection.log')
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        with open(self.log_path, 'a') as log_file:
-            log_file.write(f'New connection from {websocket.client.host}:{websocket.client.port}\n')
-            print("Logged connection to file")
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-        with open(self.log_path, 'a') as log_file:
-            log_file.write(f'Connection closed from {websocket.client.host}:{websocket.client.port}\n')
-            print("Logged disconnection to file")
     
-    def _create_json_message(self, message_type : str, data_dict : dict) ->  json:
-        return json.dumps({
-            'type': message_type,
-            'data': data_dict
-        })
-    
-    async def receive_message(self, websocket : WebSocket) -> json:
-        data = await websocket.receive_json(mode = 'text')
-        if len(data) > 0 :
-            await websocket.send_json(data)
-        return data
+    def __setitem__(self, uid: str, connection: Connection) -> None:
+        if connection is None:
+            pass #TODO trigger disconnection 
+        #TODO behavior on connection overlap?
+        self.connections[uid] = connection
 
+    def __getitem__(self, uid: str) -> Connection:
+        if uid not in self.connections: return None
+        return self.connections[uid]
+    
+    # def handle_client_message(self, message : json):
+    #     if message['type'] in MESSAGE_TYPES_SERVER:
+    #         if MESSAGE_TYPES_SERVER[message['type']] is not None:
+    #             MESSAGE_TYPES_SERVER[message['type']](message['data'])
+    #         else:
+    #             print(f'No callback function for message type {message["type"]}')
+    #     else:
+    #         print(f'Unknown message type {message["type"]}')
 
     
-    def handle_client_message(self, message : json):
-        if message['type'] in MESSAGE_TYPES_SERVER:
-            if MESSAGE_TYPES_SERVER[message['type']] is not None:
-                MESSAGE_TYPES_SERVER[message['type']](message['data'])
-            else:
-                print(f'No callback function for message type {message["type"]}')
-        else:
-            print(f'Unknown message type {message["type"]}')
-
-    async def send_shell_command(self, websocket : WebSocket,  command : str):
-        message = self._create_json_message('shell_command', {'command': command})
-        await websocket.send_text(message)
-    
-    def get_log_path(self):
-        return self.log_path
-
-manager = ConnectionManager()
-
-
-@app.websocket("/ws")
+@app.websocket("/ws") #TODO identifier in initial request?
 async def websocket_endpoint(websocket: WebSocket):
-    '''Endpoint for the websocket connection.'''
-    await manager.connect(websocket)
-    print(f'New connection from {websocket.client.host}:{websocket.client.port}')
-    try:
+    uid = str(uuid.uuid4()) # uid  generated here, to auth a connection. #TODO use preset uuid to handle connection reset
+    #TODO add authentication later
+    conn = Connection(websocket, uid)
+    ConnectionManager()[uid] = conn 
+
+    async def receive_packets():
         while True:
-            data = await manager.receive_message(websocket)
-            manager.handle_client_message(data)
-            # data = await manager.receive_message(websocket)
-            # print(f'Message received: {data}')
-            await manager.send_shell_command(websocket, 'ls')
-            response = await manager.receive_message(websocket)
-            manager.handle_client_message(response)
-            
+            try:
+                conn.receive_packet(decode_packet(await websocket.receive_json(mode = 'text')))
+            except WebSocketDisconnect: return
+            except: traceback.print_exc()
+
+    async def send_packets():
+        while True:
+            try:
+                websocket.send_json(conn.next_packet().encode())
+            except WebSocketDisconnect: return
+            except: traceback.print_exc()
+
+    loop = asyncio.get_running_loop()
+    try:
+        await websocket.accept()      
+        print(f"[{uid}] Accepted connection from {websocket.client.host}")
+
+        rect = loop.create_task(receive_packets())
+        send = loop.create_task(send_packets())
+
+        await asyncio.wait([rect, send])
+        await websocket.close()
+
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        try: await websocket.close()
-        except: pass # ignore exception as we are just making sure the connection is closed before returning
+        print(f"[{uid}] Disconnected")
+        ConnectionManager()[uid] = None

@@ -19,19 +19,6 @@ def shell_command_response(data : ShellCommandResponse):
     '''Handle the machine shell command response message.'''
     print(f'Machine shell command response: {data}')
 
-def handle_interactive_session_packet(pck: InteractiveSessionPacket):
-    #TODO:
-    # if interactive session does not exist
-    #  if this is initial packet with target machine and executable
-    #   create interactive session, this sends the initial packet
-    #   subscribe sender
-    #   return
-    # if this is ret_value (final) packet
-    #   kill session, remove session, return
-    # push data normally
-    pass
-
-
 
 
 # Merged with machine_log into log

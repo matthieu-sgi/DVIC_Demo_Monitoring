@@ -1,7 +1,7 @@
 import json
 import sys
 import base64
-from typing import Union
+from typing import Any, Union
 
 PACKET_ID_MATCHING = {
     "hardware_state": "HardwareState",
@@ -59,7 +59,7 @@ class Packet:
         """
         raise NotImplementedError()    
 
-class HardwareState(Packet):
+class PacketHardwareState(Packet):
     def __init__(self, data : dict) -> None:
         super().__init__("hardware_state")
         self.data = data
@@ -70,7 +70,7 @@ class HardwareState(Packet):
     def set_data(self, data: dict) -> None:
         self.data = data
 
-class LogEntry(Packet):
+class PacketLogEntry(Packet):
     def __init__(self, data : dict) -> None:
         super().__init__("log_entry")
         self.data = data
@@ -82,7 +82,7 @@ class LogEntry(Packet):
         self.data = data
 
 
-class DemoProcState(Packet):
+class PacketDemoProcState(Packet):
     def __init__(self, data : dict) -> None:
         super().__init__("demo_proc_state")
         self.data = data
@@ -93,7 +93,7 @@ class DemoProcState(Packet):
     def set_data(self, data: dict) -> None:
         self.data = data
 
-class ShellCommandResponse(Packet):
+class PacketShellCommandResponse(Packet):
     def __init__(self, data : dict) -> None:
         super().__init__("shell_command_response")
         self.data = data
@@ -105,14 +105,14 @@ class ShellCommandResponse(Packet):
         self.data = data
 
 
-class InteractiveSession(Packet):
-    def __init__(self, uuid: str = None) -> None:
+class PacketInteractiveSession(Packet):
+    def __init__(self, uuid: str = None, executable = None, value = None, return_value = None, target_machine = None) -> None:
         super().__init__("interactive_session")
-        self.uuid = uuid
-        self.executable = None
-        self.value = None
-        self.return_value = None
-        self.target_machine = None
+        self.uuid: str = uuid
+        self.executable: str = executable
+        self.value: Union[str, bytes] = value
+        self.return_value: int = return_value
+        self.target_machine: str = target_machine
 
     def get_data(self) -> dict:
         data = {'uuid': self.uuid}
@@ -125,7 +125,7 @@ class InteractiveSession(Packet):
     def set_data(self, data: dict):
         self.uuid = data['uuid']
         self.executable = data['executable'] if "executable" in data else None, 
-        self.value = data['value'] if "value" in data else None, 
+        self.value = self._decode_str(data['value'], False) if "value" in data else None, 
         self.return_value = data['return_value'] if "return_value" in data else None
         self.target_machine = data['target_machine'] if 'target_machine' in data else None
         return self

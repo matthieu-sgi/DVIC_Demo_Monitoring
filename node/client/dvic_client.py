@@ -8,6 +8,10 @@ from websocket import create_connection
 
 path = f'/tmp/dvic_demo_log_fifo'
 
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#NOTE: redoing this again
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 class DVICClient:
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
     def __init__(self, host, port):
@@ -66,7 +70,7 @@ class DVICClient:
         with open('/etc/hostname', 'r') as f:
             data["machine_name"] = f.read().strip()
         
-        # Machine IP address ## Has to be fixed, only display the local IP address
+        #FIXME Machine IP address ## Has to be fixed, only display the local IP address
         with open('/etc/hosts', 'r') as f:
             data["machine_ip"] = f.read().split()[0]
 
