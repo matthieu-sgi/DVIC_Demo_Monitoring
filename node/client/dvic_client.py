@@ -18,6 +18,7 @@ class DVICClient:
         self.host = host
         self.port = port
         self.ws = None
+        self.create_fifo()
         self.MESSAGE_TYPES_CLIENT = { # Put future callbacks handle functions here
         # For the client, the message types are likely to change
         'shell_command': self.execute_shell_command
@@ -25,6 +26,12 @@ class DVICClient:
     
     def send_str(self, message : str):
         self.ws.send(message)
+    
+    def create_fifo(self):
+        try :
+            os.mkdir(path)
+        except OSError as oe:
+            print(f'FIFO already exists: {oe}')
 
     def send_json(self, message : dict) -> int:
         self.ws.send(message)
