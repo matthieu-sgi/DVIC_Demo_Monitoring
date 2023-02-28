@@ -1,5 +1,6 @@
 server/.logs/
 */__pycache__/
+**/__pycache__/
 */.idea/
 */.vscode/
 */.pytest_cache/
