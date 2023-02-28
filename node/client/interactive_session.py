@@ -4,42 +4,53 @@ import subprocess
 import os
 import pty
 from typing import NoReturn
-import io, _io
+import io
 
-import client.dvic_client as dvc
+import logging
+
+from client.network.packets import PacketInteractiveSession
 
 class InteractiveSession:
-    def __init__(self, target: str, uid: str, client: dvc.DVICClient) -> None:
+    def __init__(self, target: str, uid: str, client) -> None:
         self.target_executable: str = target
         self.uid = uid # global IS UID as seen on API
-        r, w, = os.pipe()
-        r, w = os.fdopen(r, "rw"), os.fdopen(w, "wb")
-        self.input_buffer = r, w
+        self.input_buffer = os.pipe()
+        import client.dvic_client as dvc #! FIXME fix this mess, haiyaaa. Use user abstract class
         self.client: dvc.DVICClient = client
+        self.running = True
 
     def push(self, c: bytes):
         self.input_buffer[1].write(c)
 
-    def read_proco(self, a):
-        while True:
-            b = os.read(a, 1024) 
-            #TODO send packet with b
-            # print(b.decode('utf-8'), end='', flush=True)
+    def _read_process(self, a):
+        while self.running:
+            self.client.send_packet(PacketInteractiveSession(uuid=self.uid, value=os.read(a, 1024)))
 
-    def read_input_buffer(self, a):
-        # reads python stdin character by character
-        buf: _io.BufferedReader = self.input_buffer[0]
-        while True:
-            c = buf.read()
-            os.write(a, c)
+    def _read_input_buffer(self, a):
+        while self.running:
+            os.write(a, os.read(self.input_buffer[0], 10))
 
-    def launch(self) -> NoReturn:
+    def _send_termination(self, ret: int, msg: str = None):
+        self.client.send_packet(PacketInteractiveSession(uuid=self.uid, return_value=ret, value=msg))
+        self.client._unregister_interactive_session(self)
+
+    def kill(self) -> None:
+        self.process_obj.kill()
+
+    def launch(self) -> None:
+        Thread(target=self.run, daemon=True).start()
+
+    def run(self) -> int:
+        logging.info(f'[SESSION] Starting session {self.uid} with cmd {self.target_executable}')
         master, slave = pty.openpty() # ptty for session handling
-        a = Popen([self.target_executable], shell=False, start_new_session=True, stdin=slave, stdout=slave, stderr=slave, bufsize=0) # notice buffering, session_start
-        Thread(target=self.read_proco,        args=(self, master), daemon=True).start()
-        Thread(target=self.read_input_buffer, args=(self, master), daemon=True).start()
+        self.process_obj = Popen([self.target_executable], shell=False, start_new_session=True, stdin=slave, stdout=slave, stderr=slave, bufsize=0) # notice buffering, session_start
+        Thread(target=self._read_process,      args=(master,), daemon=True).start()
+        Thread(target=self._read_input_buffer, args=(master,), daemon=True).start()
         while True:
-            try: rt = a.wait(1); break
+            try: rt = self.process_obj.wait(1); break
             except subprocess.TimeoutExpired: pass
-
-        #TODO send termination packet
+        # Teardown
+        logging.info(f'[SESSION] Session {self.uid} terminated with code {rt}')
+        self.running = False
+        self._send_termination(rt)
+        return rt
