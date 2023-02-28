@@ -3,7 +3,7 @@ from fastapi import WebSocket
 from dvic_log_server.network.packets import *
 from multiprocessing import Queue
 
-import server.dvic_log_server.interactive_sessions as sessions
+
 
 
 class Connection:
@@ -27,7 +27,8 @@ class Connection:
         raise NotImplementedError()
 
     def _handle_interactive_session(self, pck: PacketInteractiveSession):
-        sessions.InteractiveSession.handle_packet(self, pck)
+        from dvic_log_server.interactive_sessions import InteractiveSession # defer import *shrug*
+        InteractiveSession.handle_packet(self, pck)
 
 class MachineConnection(Connection): #? usefull
     def __init__(self, ws: WebSocket) -> None:

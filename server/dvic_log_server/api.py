@@ -45,8 +45,8 @@ class ConnectionManager:
     #         print(f'Unknown message type {message["type"]}')
 
     
-@app.websocket("/ws") #TODO identifier in initial request?
-async def websocket_endpoint(websocket: WebSocket):
+@app.websocket("/ws/{uid}") #TODO identifier in initial request?
+async def websocket_endpoint(websocket: WebSocket, uid: str):
     uid = str(uuid.uuid4()) # uid  generated here, to auth a connection. #TODO use preset uuid to handle connection reset
     #TODO add authentication later
     conn = Connection(websocket, uid)
