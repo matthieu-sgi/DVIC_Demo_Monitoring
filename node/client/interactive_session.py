@@ -4,23 +4,24 @@ import subprocess
 import os
 import pty
 from typing import NoReturn
-import io
+import traceback
 
 import logging
+from client.meta import AbstractDVICNode
 
 from client.network.packets import PacketInteractiveSession
 
 class InteractiveSession:
-    def __init__(self, target: str, uid: str, client) -> None:
+    def __init__(self, target: str, uid: str, client: AbstractDVICNode) -> None:
         self.target_executable: str = target
         self.uid = uid # global IS UID as seen on API
         self.input_buffer = os.pipe()
-        import client.dvic_client as dvc #! FIXME fix this mess, haiyaaa. Use user abstract class
-        self.client: dvc.DVICClient = client
+        
+        self.client: AbstractDVICNode = client
         self.running = True
 
     def push(self, c: bytes):
-        self.input_buffer[1].write(c)
+        os.write(self.input_buffer[1], c)
 
     def _read_process(self, a):
         while self.running:
@@ -32,7 +33,7 @@ class InteractiveSession:
 
     def _send_termination(self, ret: int, msg: str = None):
         self.client.send_packet(PacketInteractiveSession(uuid=self.uid, return_value=ret, value=msg))
-        self.client._unregister_interactive_session(self)
+        self.client._unregister_interactive_session(self.uid)
 
     def kill(self) -> None:
         self.process_obj.kill()
@@ -42,15 +43,21 @@ class InteractiveSession:
 
     def run(self) -> int:
         logging.info(f'[SESSION] Starting session {self.uid} with cmd {self.target_executable}')
-        master, slave = pty.openpty() # ptty for session handling
-        self.process_obj = Popen([self.target_executable], shell=False, start_new_session=True, stdin=slave, stdout=slave, stderr=slave, bufsize=0) # notice buffering, session_start
-        Thread(target=self._read_process,      args=(master,), daemon=True).start()
-        Thread(target=self._read_input_buffer, args=(master,), daemon=True).start()
-        while True:
-            try: rt = self.process_obj.wait(1); break
-            except subprocess.TimeoutExpired: pass
+        try:
+            master, slave = pty.openpty() # ptty for session handling
+            self.process_obj = Popen([self.target_executable], shell=False, start_new_session=True, stdin=slave, stdout=slave, stderr=slave, bufsize=0) # notice buffering, session_start
+            Thread(target=self._read_process,      args=(master,), daemon=True).start()
+            Thread(target=self._read_input_buffer, args=(master,), daemon=True).start()
+            while True:
+                try: rt = self.process_obj.wait(1); break
+                except subprocess.TimeoutExpired: pass
+            msg = None
+        except Exception as e:
+            traceback.print_exc()
+            rt = -1
+            msg = f'Exception {type(e)} in session: {str(e)}'
         # Teardown
-        logging.info(f'[SESSION] Session {self.uid} terminated with code {rt}')
+        print(f'[SESSION] Session {self.uid} terminated with code {rt}')
         self.running = False
-        self._send_termination(rt)
+        self._send_termination(rt, msg)
         return rt

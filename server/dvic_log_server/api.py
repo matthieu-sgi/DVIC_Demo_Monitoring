@@ -28,7 +28,11 @@ class ConnectionManager:
     def __setitem__(self, uid: str, connection: Connection) -> None:
         if connection is None:
             pass #TODO trigger disconnection 
-        #TODO behavior on connection overlap?
+        
+        if uid in self.connections and connection is not None:
+            print(f'[{uid}] Replacing connection')
+            #TODO behavior on connection overlap?
+
         self.connections[uid] = connection
 
     def __getitem__(self, uid: str) -> Connection:
@@ -55,28 +59,44 @@ async def websocket_endpoint(websocket: WebSocket, uid: str):
     async def receive_packets():
         while True:
             try:
-                conn.receive_packet(decode_packet(await websocket.receive_json(mode = 'text')))
+                conn.receive_packet(decode_packet(await websocket.receive_text()))
             except WebSocketDisconnect: return
-            except: traceback.print_exc()
+            except: 
+                if conn.is_disconnected(): return
+                traceback.print_exc()
 
     async def send_packets():
         while True:
             try:
-                websocket.send_json(conn.next_packet().encode())
-            except WebSocketDisconnect: return
+                await asyncio.sleep(1/120)
+                if conn.is_disconnected(): return
+                pck = conn.next_packet()
+                if pck is None: continue
+                await websocket.send_text(pck.encode())
+                
+            except WebSocketDisconnect: break
+            except asyncio.CancelledError: break
             except: traceback.print_exc()
+        print(f"[{uid}] Send loop closing")
 
     loop = asyncio.get_running_loop()
     try:
         await websocket.accept()      
         print(f"[{uid}] Accepted connection from {websocket.client.host}")
 
-        rect = loop.create_task(receive_packets())
-        send = loop.create_task(send_packets())
-
-        await asyncio.wait([rect, send])
-        await websocket.close()
+        # rect = loop.create_task(receive_packets())
+        send: asyncio.Task = loop.create_task(send_packets())
+        while True:
+            try:
+                conn.receive_packet(decode_packet(await websocket.receive_text()))
+            except: 
+                if conn.is_disconnected(): break
+                traceback.print_exc()
+                try: await websocket.close()
+                except: pass
 
     except WebSocketDisconnect:
-        print(f"[{uid}] Disconnected")
-        ConnectionManager()[uid] = None
+        print('[{uid}] Err: disconnected')
+    send.cancel()
+    print(f"[{uid}] Disconnected")
+    ConnectionManager()[uid] = None

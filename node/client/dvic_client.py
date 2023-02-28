@@ -9,22 +9,27 @@ from typing import NoReturn
 from client.network.packets import Packet, decode as decode_packet, PacketInteractiveSession
 from threading import Thread
 
-from websocket import create_connection, WebSocketApp
+from websocket import create_connection, WebSocket
 import logging
 from client.interactive_session import InteractiveSession
+from client.meta import AbstractDVICNode
 
-DEFAULT_UID = "1d1f0545-2b60-488e-9419-d54b23bda47d" #fixed for testing
+DEFAULT_UID = "1d1f0545-2b60-488e-9419-d54b23bda47d" #fixed for testing TODO: read from config.
 DEFAULT_ENDPOINT = 'wss://dvic.devinci.fr/demo_control/ws/'
 
-class DVICClient:
+class DVICClient(AbstractDVICNode):
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
     def __init__(self):        
+        super().__init__()
         self.send_queue = Queue()
         self.interactive_sessions: dict[str, InteractiveSession] = {}
-        self.ws = WebSocketApp(self.url, on_open=self.on_open, on_message=self.on_message, on_close=self.on_close, on_error=self.on_error)
-
+        print(f'[STARTUP] Connection to {self.url}')
+        self.ws: WebSocket = create_connection(self.url)
+        print(f'[STARTUP] Connected')
+        
     def _send_thread_target(self):
         try:
+            print("Starting send thread")
             while True:
                 pck: Packet = self.send_queue.get()
                 self.ws.send(pck.encode())
@@ -44,21 +49,36 @@ class DVICClient:
         self.send_queue.put(pck)
 
     def receive_packet(self, pck: Packet):
-        getattr(self, f'_handle_{pck.identifier}')(pck)
+        try: getattr(self, f'_handle_{pck.identifier}')(pck)
+        except: traceback.print_exc()
 
     def run(self) -> NoReturn:
-        self.ws.run_forever()
+        Thread(target=self._send_thread_target,  daemon=True).start()
+        Thread(target=self._recpt_thread_target, daemon=True).start()
+        input()
 
-    def on_open(self, ws: WebSocketApp):
-        logging.info(f"[CONNECTION] Connected to {self.url}")
-        Thread(target=self._send_thread_target).run()
+    # def on_open(self, ws: WebSocketApp):
+    #     logging.info(f"[CONNECTION] Connected to {self.url}")
 
-    def on_message(self, ws: WebSocketApp, data: str):
-        self.receive_packet(decode_packet(data))
+    def _recpt_thread_target(self):
+        print('Receiving...')
+        while True:
+            try:
+                data = self.ws.recv()
+                if data is None: return #EOF 
+                self.receive_packet(decode_packet(data))
+            except:
+                traceback.print_exc()
+                if not self.ws.connected: return
 
-    def on_close(self, ws: WebSocketApp, sts, msg):
-        logging.error(f'[CONNECTION] Ws closed with message: {msg}. Status is {sts} ')
+    # def on_data(self, ws: WebSocketApp, data: str, data_type, more):
+    #     if more == 0:
+    #         print("Expect trouble")
+    #     print(data)
+    #     self.receive_packet(decode_packet(data))
 
+    # def on_close(self, ws: WebSocketApp, sts, msg):
+    #     logging.error(f'[CONNECTION] Ws closed with message: {msg}. Status is {sts} ')
 
     # / / / / / handlers
 
@@ -68,12 +88,14 @@ class DVICClient:
             iss: InteractiveSession = self.interactive_sessions[uid]
             iss.push(pck.value)
         else:
+            #TODO refuse if more than xx sessions
             self.interactive_sessions[uid] = InteractiveSession(pck.executable, uid, self)
+            print(f'[SESSION] Launching interactive session {uid}')
             self.interactive_sessions[uid].launch()
     
-    def _unregister_interactive_session(self, session: InteractiveSession):
-        if session.uid in self.interactive_sessions:
-            del self.interactive_sessions[session.uid]
+    def _unregister_interactive_session(self, uid: str):
+        if uid in self.interactive_sessions:
+            del self.interactive_sessions[uid]
 
     #TODO @Matthieu implement the rest of the handlers
    
@@ -89,33 +111,17 @@ class DVICClient:
     #         print(f'Unknown message type {message["type"]}')
 
     
-    def execute_shell_command(self, data : dict):
+    def execute_shell_command(self, command: str) -> None:
         '''Execute a shell command on the DVIC node.'''
-        command = data['command']
-        print(f'Executing shell command: {command}')
+        print(f'Executing shell command: {command}') 
         stdout, stderr = None, None
         with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
-        return self.create_json_message('shell_command_response', {'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')})
+        self.create_json_message('shell_command_response', {'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')}) # send packet directly with return uid 
 
 
 
 if __name__ == '__main__':
-    logging.info(f'[PRGM] Starting DVIC Demo Watcher Node')
+    print(f'[PRGM] Starting DVIC Demo Watcher Node')
     client = DVICClient()
     client.run()
-
-    # print('Connected to DVIC log server.')
-    # input('Press enter to send json...')
-    # print('Sending data...')
-    # # message = client.create_json_message('machine_hardware_state', {'test': 'test'})
-    # # client.send_json(message)
-    # print(client.get_machine_hardware_info())
-    # input('Press enter to send json...')
-    # client.send_json(client.get_machine_hardware_info())
-    # print('Message sent.')
-    # client.handle_server_message()
-    # input('Press enter to close connection...')
-    # print('Closing connection...')
-    # print(client.get_machine_software_info())
-
