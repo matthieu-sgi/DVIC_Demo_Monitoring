@@ -3,8 +3,6 @@
 import traceback
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-import uuid
-import json
 import asyncio
 import os
 
@@ -15,12 +13,10 @@ from dvic_log_server.utils import singleton
 
 app = FastAPI()
 
-
-
 @singleton
 class ConnectionManager:
     def __init__(self):
-        self.connections = {}
+        self.connections: dict[str, Connection] = {}
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         #remove the 'dvic_log_server' part of the path
         self.log_path = self.log_path[:self.log_path.rfind('/')]
@@ -29,10 +25,19 @@ class ConnectionManager:
         if connection is None:
             pass #TODO trigger disconnection 
         
-        if uid in self.connections and connection is not None:
-            print(f'[{uid}] Replacing connection')
-            #TODO behavior on connection overlap?
+        if uid in self.connections:
+            if connection is not None:
+                print(f'[{uid}] Replacing connection')
+                self.connections[uid].close()
+                connection.inherit(self.connections[uid])
+                #TODO behavior on connection overlap? testing
+            else:
+                if not self.connections[uid].is_disconnected(): 
+                    return # don't replace connection with None if the connection was replaced before the disconnection #! is_disconnected_ is borked
 
+        if connection is None:
+            del self.connections[uid]
+            return
         self.connections[uid] = connection
 
     def __getitem__(self, uid: str) -> Connection:
@@ -56,15 +61,6 @@ async def websocket_endpoint(websocket: WebSocket, uid: str):
     conn = Connection(websocket, uid)
     ConnectionManager()[uid] = conn 
 
-    async def receive_packets():
-        while True:
-            try:
-                conn.receive_packet(decode_packet(await websocket.receive_text()))
-            except WebSocketDisconnect: return
-            except: 
-                if conn.is_disconnected(): return
-                traceback.print_exc()
-
     async def send_packets():
         while True:
             try:
@@ -77,7 +73,7 @@ async def websocket_endpoint(websocket: WebSocket, uid: str):
             except WebSocketDisconnect: break
             except asyncio.CancelledError: break
             except: traceback.print_exc()
-        print(f"[{uid}] Send loop closing")
+        # print(f"[{uid}] Send loop closing")
 
     loop = asyncio.get_running_loop()
     try:
@@ -89,6 +85,7 @@ async def websocket_endpoint(websocket: WebSocket, uid: str):
         while True:
             try:
                 conn.receive_packet(decode_packet(await websocket.receive_text()))
+            except WebSocketDisconnect: raise
             except: 
                 if conn.is_disconnected(): break
                 traceback.print_exc()
@@ -96,7 +93,8 @@ async def websocket_endpoint(websocket: WebSocket, uid: str):
                 except: pass
 
     except WebSocketDisconnect:
-        print('[{uid}] Err: disconnected')
+        print(f'[{uid}] Err: disconnected')
+    conn.in_use = False #FIXME put in a method
     send.cancel()
     print(f"[{uid}] Disconnected")
     ConnectionManager()[uid] = None

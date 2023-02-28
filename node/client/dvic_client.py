@@ -5,6 +5,7 @@ from multiprocessing import Queue
 import os
 import subprocess
 import traceback
+import atexit
 from typing import NoReturn
 from client.network.packets import Packet, decode as decode_packet, PacketInteractiveSession
 from threading import Thread
@@ -52,7 +53,11 @@ class DVICClient(AbstractDVICNode):
         try: getattr(self, f'_handle_{pck.identifier}')(pck)
         except: traceback.print_exc()
 
+    def exit_handler(self):
+        self.ws.close()
+
     def run(self) -> NoReturn:
+        atexit.register(self.exit_handler)
         Thread(target=self._send_thread_target,  daemon=True).start()
         Thread(target=self._recpt_thread_target, daemon=True).start()
         input()

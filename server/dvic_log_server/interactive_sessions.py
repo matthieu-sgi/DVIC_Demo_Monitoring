@@ -69,7 +69,7 @@ class InteractiveSession:
                 
                 session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine])
                 INTERACTIVE_SESSIONS[pck.uuid] = session
-                print(f'Registered session {pck.uuid}')
+                print(f'[SESSION] Registered session {pck.uuid}')
                 # subscribe sender
                 session.subscribe(src)
                 return 

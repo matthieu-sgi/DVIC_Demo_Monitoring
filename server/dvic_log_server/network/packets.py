@@ -3,12 +3,17 @@ import sys
 import base64
 import traceback
 from typing import Any, Union
+from enum import Enum
 
+class NodeStatusAction(Enum):
+    LIST_NODES = "list"
+    
 PACKET_ID_MATCHING = {
     "hardware_state": "HardwareState",
     "log_entry": "LogEntry",
     "demo_proc_state": "DemoProcState",
-    "interactive_session": "InteractiveSession"
+    "interactive_session": "InteractiveSession",
+    "node_status": "NodeStatus"
 } # identifier -> str(class<Packet>)
 
 class Packet:
@@ -59,6 +64,23 @@ class Packet:
             This method must be implemented in the classes expanding from Packet
         """
         raise NotImplementedError()    
+
+class PacketNodeStatus(Packet):
+    def __init__(self, action: NodeStatusAction = None, node_status: dict[str, str] = None) -> None:
+        super().__init__("node_status")
+        self.action = action.value if action is not None else None
+        self.node_status = node_status
+
+    def get_data(self) -> dict:
+        return {
+            'action': self.action,
+            'node_status': self.node_status
+        }
+    
+    def set_data(self, data: dict) -> Packet:
+        self.action = NodeStatusAction(data['action']) if data['action'] is not None else None
+        self.node_status = data['node_status']
+        return self
 
 class PacketHardwareState(Packet):
     def __init__(self, data : dict) -> None:

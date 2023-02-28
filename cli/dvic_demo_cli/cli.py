@@ -7,7 +7,7 @@ from threading import Thread
 from multiprocessing import Queue
 from dvic_demo_cli.interactive_session import InteractiveSession
 from dvic_demo_cli.meta import DVICDemoWatcherCliBase
-from dvic_demo_cli.network.packets import Packet, decode, PacketInteractiveSession
+from dvic_demo_cli.network.packets import *
 from websocket import create_connection, WebSocket
 
 DEFAULT_ENDPOINT = 'wss://dvic.devinci.fr/demo_control/ws/'
@@ -29,10 +29,16 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
         if not base.endswith('/'): base = f'{base}/'
         return f'{base}{self.uid}'
 
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, a, b, c):
+        self.close()
+
     def _packet_reception_thread_target(self):
         while True:
             data = self.ws.recv()
-            if data is None: return #EOF
+            if data is None or len(data) == 0: return #EOF
             pck: Packet = decode(data)
             self.receive_packet(pck)
 
@@ -43,6 +49,9 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
                 self.ws.send(pck.encode())
             except:
                 traceback.print_exc()
+
+    def request_node_list(self):
+        self.send_packet(PacketNodeStatus(action=NodeStatusAction.LIST_NODES))
 
     def receive_packet(self, pck: Packet):
         try:
@@ -65,11 +74,17 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
     def send_packet(self, pck: Packet) -> None:
         self.send_queue.put(pck)
 
+    def close(self):
+        self.ws.close()
+
     def _handle_packet_interactive_session(self, pck: PacketInteractiveSession):
         uuid = pck.uuid
         if uuid in self.sessions:
             if self.sessions[uuid].receive_packet(pck):
                 del self.sessions[uuid]
+
+    def _handle_packet_node_status(self, pck: PacketNodeStatus):
+        print(pck.node_status)
 
 
 if __name__ == '__main__':
@@ -88,7 +103,12 @@ if __name__ == '__main__':
         os.environ['WEBSOCKET_URL'] = "ws://127.0.0.1:8000/ws"
 
     cli = DVICDemoWatcherCli()
-    if args.target:
-        cli.launch_interactive_session(args.target, args.exec, True)
-    else:
-        cli.join_interactive_session(args.join, True)
+    with cli:
+
+        cli.request_node_list()
+        # input()    
+
+        if args.target:
+            cli.launch_interactive_session(args.target, args.exec, True)
+        else:
+            cli.join_interactive_session(args.join, True)

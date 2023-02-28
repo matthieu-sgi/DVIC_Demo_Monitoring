@@ -1,8 +1,10 @@
 from fastapi import WebSocket
 
+import asyncio
 from dvic_log_server.network.packets import *
 from multiprocessing import Queue
 
+from time import time
 from starlette.websockets import WebSocketState
 
 class Connection:
@@ -10,6 +12,8 @@ class Connection:
         self.ws = ws
         self.uid = uid
         self.send_queue: Queue = Queue()
+        self.in_use = True
+        self.last_seen = time()
 
     def inherit(self, connection):
         """Inherit previous connection that was reset
@@ -23,7 +27,7 @@ class Connection:
         pass
 
     def is_disconnected(self) -> bool:
-        return self.ws.application_state != WebSocketState.CONNECTED
+        return self.ws.application_state != WebSocketState.CONNECTED or not self.in_use
 
     def send_packet(self, pck: Packet):
         self.send_queue.put(pck)
@@ -33,12 +37,30 @@ class Connection:
         except: return None
 
     def receive_packet(self, pck: Packet):
+        self.last_seen = time()
         getattr(self, f'_handle_{pck.identifier}')(pck)
     
+    def close(self):
+        self.in_use = False
+        asyncio.run_coroutine_threadsafe(self.ws.close(), asyncio.get_event_loop())
+
     # handlers
 
     def _handle_machine_hardware_state(self, pck: PacketHardwareState):
         raise NotImplementedError()
+
+    def _handle_node_status(self, pck: PacketNodeStatus):
+        from dvic_log_server.api import ConnectionManager #! fix this mess haiyaa
+        if pck.action is not None:
+            if pck.action == NodeStatusAction.LIST_NODES:
+                connections = {
+                    k: {
+                        'status': "connected" if v is not None and not v.is_disconnected() else "disconnected",
+                        'last_seen': v.last_seen
+                       } 
+                    for k, v in ConnectionManager().connections.items()
+                }
+                self.send_packet(PacketNodeStatus(node_status=connections))
 
     def _handle_interactive_session(self, pck: PacketInteractiveSession):
         from dvic_log_server.interactive_sessions import InteractiveSession # defer import *shrug*
