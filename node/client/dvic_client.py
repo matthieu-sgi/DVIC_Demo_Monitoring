@@ -74,6 +74,8 @@ class DVICClient:
     def _unregister_interactive_session(self, session: InteractiveSession):
         if session.uid in self.interactive_sessions:
             del self.interactive_sessions[session.uid]
+
+    #TODO @Matthieu implement the rest of the handlers
    
     # def handle_server_message(self):
     #     message = self.receive_json()
