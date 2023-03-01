@@ -65,6 +65,17 @@ class Packet:
         """
         raise NotImplementedError()    
 
+class PacketFileTransfer(Packet):
+    def __init__(self, path: str = None, content: bytes = None, mode: str = None, owner: str = None) -> None:
+        super().__init__("file_transfer")
+
+class PacketNodeConfig(Packet):
+    """Change a config element in a node or pull the current config
+    """
+    def __init__(self, mode: str = None, key: str = None, value: str = None) -> None:
+        super().__init__("node_config_update")
+
+
 class PacketNodeStatus(Packet):
     def __init__(self, action: NodeStatusAction = None, node_status: dict[str, str] = None) -> None:
         super().__init__("node_status")
