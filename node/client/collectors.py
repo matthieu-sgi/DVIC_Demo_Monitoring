@@ -1,8 +1,71 @@
 '''Collectors for the DVIC node.'''
+
+# import Queue
+from multiprocessing import Queue
+
 import asyncio
 import subprocess
 import threading
 import os
+
+class LogReader():
+    '''Class used to handle the log reading
+        ----- Parameters -----
+        file_path : str = None
+        journal_unit : str = None
+    '''
+    def __init__(self, file_path : str = None, journal_unit : str = None):
+        self.file_path = file_path
+        self.journal_unit = journal_unit
+        self.process = None
+        self.thread = None
+        self.running = False
+        self.queue : Queue = Queue()
+    
+    def read_loop(self):
+        '''Read the log file'''
+        while self.running:
+            line = self.process.stdout.readline()
+            if line:
+                self.queue.put(line.decode('utf-8').strip())
+    
+    def launch(self):
+        '''Launch the log reader'''
+        if self.file_path is not None:
+            self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        elif self.journal_unit is not None:
+            self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            raise Exception('No file path or journal unit specified')
+        
+        self.running = True
+        self.thread = threading.Thread(target=self.read_loop, daemon=True)
+        self.thread.start()
+
+class LogReaderManager():
+    def __init__(self):
+        self.log_readers = []
+    
+    def add_log_reader(self, log_reader : LogReader):
+        self.log_readers.append(log_reader)
+
+    def launch_reader(self, log_reader : LogReader):
+        log_reader.launch()
+    
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
 
 def get_machine_hardware_info():
     # Get system temperature
