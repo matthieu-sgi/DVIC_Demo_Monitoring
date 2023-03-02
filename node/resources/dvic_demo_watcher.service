@@ -4,5 +4,4 @@ After=network.target
 Requires=network.target
 Type=simple
 Restart=always
-User=root
 ExecStart=/opt/dvic-demo-watcher/dvic_client.py

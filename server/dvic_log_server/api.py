@@ -53,8 +53,16 @@ class ConnectionManager:
     #     else:
     #         print(f'Unknown message type {message["type"]}')
 
+@app.get('/install/{install_token}')
+def installer_download(install_token: str):
+    """
+    Initiates download of the pre-packaged installer with UID set to a generated UID for the new node.
+    The install_token is a one-time unique token generated when receiving a PacketNodeCreation
+    """
+
+    pass
     
-@app.websocket("/ws/{uid}") #TODO identifier in initial request?
+@app.websocket("/ws/{uid}/{conn_token}") #TODO identifier in initial request?
 async def websocket_endpoint(websocket: WebSocket, uid: str):
     # uid = str(uuid.uuid4()) # uid  generated here, to auth a connection. #TODO use preset uuid to handle connection reset
     #TODO add authentication later

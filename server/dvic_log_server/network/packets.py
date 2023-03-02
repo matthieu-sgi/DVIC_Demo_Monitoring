@@ -4,6 +4,7 @@ import base64
 import traceback
 from typing import Any, Union
 from enum import Enum
+from dataclasses import dataclass
 
 class NodeStatusAction(Enum):
     LIST_NODES = "list"
@@ -15,6 +16,15 @@ PACKET_ID_MATCHING = {
     "interactive_session": "InteractiveSession",
     "node_status": "NodeStatus"
 } # identifier -> str(class<Packet>)
+
+@dataclass
+class NodeSelector: #TODO add selector 
+    """
+    Node selector used to select nodes to which send certain specific packets
+    Used for cli -> api
+    """
+    uids: list[str] = None 
+    tags: list[str] = None
 
 class Packet:
 
@@ -70,7 +80,8 @@ class PacketFileTransfer(Packet):
         super().__init__("file_transfer")
 
 class PacketNodeConfig(Packet):
-    """Change a config element in a node or pull the current config
+    """
+    Change a config element in a node or pull the current config
     """
     def __init__(self, mode: str = None, key: str = None, value: str = None) -> None:
         super().__init__("node_config_update")
