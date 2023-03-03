@@ -3,10 +3,10 @@
 # import Queue
 from multiprocessing import Queue
 
-import asyncio
 import subprocess
 import threading
 import os
+import logging #### Only for testing
 
 class LogReader():
     '''Class used to handle the log reading
@@ -14,7 +14,7 @@ class LogReader():
         file_path : str = None
         journal_unit : str = None
     '''
-    def __init__(self, file_path : str = None, journal_unit : str = None):
+    def __init__(self, *, file_path : str = None, journal_unit : str = None):
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = None
@@ -24,6 +24,7 @@ class LogReader():
     
     def read_loop(self):
         '''Read the log file'''
+
         while self.running:
             line = self.process.stdout.readline()
             if line:
@@ -32,8 +33,10 @@ class LogReader():
     def launch(self):
         '''Launch the log reader'''
         if self.file_path is not None:
+            logging.info(f'Launching log reader for {self.file_path}')
             self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         elif self.journal_unit is not None:
+            logging.info(f'Launching log reader for {self.journal_unit}')
             self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
             raise Exception('No file path or journal unit specified')
@@ -41,6 +44,53 @@ class LogReader():
         self.running = True
         self.thread = threading.Thread(target=self.read_loop, daemon=True)
         self.thread.start()
+
+    def get_type(self):
+        '''Get the type of log reader'''
+        if self.file_path is not None:
+            return 'file'
+        elif self.journal_unit is not None:
+            return 'journal'
+        else:
+            return 'unknown'
+    
+    def get_logs(self):
+        '''Get the logs from the queue'''
+        data = {}
+        if not self.queue.empty():
+            if self.get_type() == 'file':
+                data['path'] = self.file_path
+            elif self.get_type() == 'journal':
+                data['unit'] = self.journal_unit
+            temp = {}
+            size = self.queue.qsize()
+            # print(self.queue.qsize())
+            while not self.queue.empty():
+                content = self.queue.get()
+                if self.get_type() == 'file':
+                    temp['content'] = content
+                elif self.get_type() == 'journal':
+                    content = content.split(' ')
+                    temp['date'] = ' '.join(content[0:2])
+                    temp['time'] = content[2]
+                    temp['machine'] = content[3]
+                    temp['content'] = ' '.join(content[4:])
+
+                
+                data[size - self.queue.qsize()] = temp
+        return data
+
+    
+    
+    def __len__(self):
+        return self.queue.qsize()
+    
+    def stop(self):
+        '''Stop the log reader'''
+        self.running = False
+        self.thread.join()
+        self.process.kill()
+        self.process.wait()
 
 class LogReaderManager():
     def __init__(self):
@@ -52,9 +102,42 @@ class LogReaderManager():
     def launch_reader(self, log_reader : LogReader):
         log_reader.launch()
     
+    def launch_all(self):
+        for log_reader in self.log_readers:
+            self.launch_reader(log_reader)
+
+    def stop_all(self):
+        for log_reader in self.log_readers:
+            log_reader.stop()
+    
+    def get_logs(self, log_reader : LogReader): #FIXME : Has to be changed depending on the usage
+        return log_reader.get_logs()
+    
     
 
     
+if __name__ == '__main__': # Only for testing
+
+    format = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=format, level=logging.INFO,
+                        datefmt="%H:%M:%S")
+    logging.info("Main    : before creating thread")
+
+    log_reader = LogReader(journal_unit='docker.service')
+    log_reader.launch()
+
+    try :
+        while True:
+            # logging.info(f'manual : {process.stdout.readline().decode("utf-8").strip()}')
+            logs = log_reader.get_logs()
+            if logs:
+                logging.info(f'Logs : {logs}')
+            continue
+    except KeyboardInterrupt:
+        log_reader.running = False
+        log_reader.thread.join()
+        log_reader.process.kill()
+        log_reader.process.wait()
 
 
 
@@ -66,8 +149,7 @@ class LogReaderManager():
 
 
 
-
-def get_machine_hardware_info():
+def get_machine_hardware_info(): # TODO : Has to be merged with the new class. Not sur how to do it yet
     # Get system temperature
     counter = 0
     data = {}
@@ -121,93 +203,4 @@ def get_machine_hardware_info():
 
 
 
-
-
-
-def get_machine_software_info(*wanted_log_names : str):
-    '''Get the software information of the DVIC node.
-    The information include the IsAlive state of the demo process, the logs of the system, the status of the services, etc.'''
-    #TODO : Check if the demo process is running, return the state of the demo process (IS_ALIVE, IS_DEAD, IS_NOT_RUNNING)
-    #FIXME : convert the journal log to a readable format
-    data = {}
-    # older version of the code
-    # special_files = ['dmesg', 'syslog']
-    # # Get all .log files in the /var/log directory
-    # log_files = []
-    # for file in os.listdir('/var/log'):
-    #     if file.endswith('.log') or file in special_files:
-    #         log_files.append(file)
-    
-    # for log_file in log_files:
-    #     with open(f'/var/log/{log_file}', 'r') as f:
-    #         name_to_save = log_file.split('.')[0]
-    #         data[name_to_save] = f.read()
-
-
-    
-    # # Fetch the log of journalctl
-    # for dir in os.listdir('/var/log/journal'):
-    #     for file in os.listdir(f'/var/log/journal/{dir}'):
-    #         if file.endswith('.journal'):
-    #             with open(f'/var/log/journal/{dir}/{file}', 'r') as f:
-    #                 data[file] = f.read()
-
-
-
-
-
-    return data
-    
-
-    # Get the status of the services
-    
-
-
-
-
-
-async def read_fifo(filename):
-    with open(filename) as fifo:
-        while True:
-            data = fifo.readline()
-            if not data:
-                await asyncio.sleep(0.01)  # sleep for 10 milliseconds to avoid CPU spikes
-            else:
-                return data
-
-async def fetch_fifos(path):
-    '''Get the list of fifo files in the path, create a routine to read the fifo files and return the data read from the fifo files.
-    Handle the creation of a new fifo file and put it in a routine'''
-    #TODO : Get the fifo data in a blocking way in another thread
-    fifo_files = []
-    while True:
-        for file in os.listdir(path):
-            if file.endswith('.fifo'):
-                fifo_files.append(file)
-
-        
-        # Create a routine to read the fifo files
-        tasks = []
-        for fifo_file in fifo_files:
-            if fifo_file not in tasks:
-                tasks.append(asyncio.create_task(read_fifo(fifo_file)))
-        return await asyncio.gather(*tasks)
-    
-    
-
-
-
-base_path = '/tmp/dvic_demo_log_fifo'
-
-
-async def get_demo_logs():
-    '''Get the logs of the demo processes. Fetch the logs from the fifo files.
-    The fifo files are created by the demo processes and are located in /tmp/dvic_demo_log_fifo_<pid>'''
-
-    # Get the list of fifo files
-    return await fetch_fifos(base_path)
-
-
-if __name__ == '__main__':
-    print(get_machine_software_info())    
 
