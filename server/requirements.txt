@@ -2,3 +2,4 @@ fastapi
 websockets
 uvicorn
 json
+elasticsearch
