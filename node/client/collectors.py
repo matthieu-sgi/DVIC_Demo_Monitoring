@@ -14,12 +14,21 @@ class LogReader():
         file_path : str = None
         journal_unit : str = None
     '''
-    def __init__(self, *, file_path : str = None, journal_unit : str = None):
+    def __init__(self, *, file_path : str = None, journal_unit : str = None, hardware_info : str = None):
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = None
         self.thread = None
         self.running = False
+        # self.HARDWARE_INFO_ENUM = {
+        #     'cpu': 'cpu',
+        #     'gpu': 'gpu',
+        #     'memory': 'memory',
+        #     'disk': 'disk',
+        #     'network': 'network',
+        #     'system': 'system'
+        # }
+        
         self.queue : Queue = Queue()
     
     def read_loop(self):
@@ -79,6 +88,59 @@ class LogReader():
                 
                 data[size - self.queue.qsize()] = temp
         return data
+
+    def get_machine_hardware_info(self): # TODO : Has to be merged with the new class. Not sur how to do it yet
+        # Not sure that it's necessary to have a class for this
+        # Get system temperature
+        counter = 0
+        data = {}
+
+        # Machine name 
+        with open('/etc/hostname', 'r') as f:
+            data["machine_name"] = f.read().strip()
+        
+        #FIXME Machine IP address ## Has to be fixed, only display the local IP address
+        with open('/etc/hosts', 'r') as f:
+            data["machine_ip"] = f.read().split()[0]
+
+
+        temps = {}
+        while True :
+            try:
+                temp_name = ''
+                temp_temp = 0
+                with open(f'/sys/class/thermal/thermal_zone{counter}/type', 'r') as type_file:
+                    temp_name = type_file.read().strip()
+                with open(f'/sys/class/thermal/thermal_zone{counter}/temp', 'r') as temp_file:
+                    temp_temp = float(temp_file.read()) / 1000
+                temps[temp_name] = temp_temp
+                counter += 1
+            except FileNotFoundError:
+                break
+        data["temperature"] = temps
+        
+        with open('/proc/stat') as f:
+            fields = [float(column) for column in f.readline().strip().split()[1:]]
+        idle, total = fields[3], sum(fields)
+        cpu_usage = round(100 * (1.0 - (float)(idle / total)), 2)
+        data["cpu_usage"] = cpu_usage
+
+        # Get system memory
+        with open('/proc/meminfo') as f:
+            meminfo = dict((i.split()[0].rstrip(':'), int(i.split()[1])) for i in f.readlines())
+        mem_total = meminfo['MemTotal']
+        mem_free = meminfo['MemFree']
+        mem_available = meminfo['MemAvailable']
+        mem_used = round(100 * (1.0 - (float)(mem_available / mem_total)), 2)
+        memory_info = {
+            'total': mem_total,
+            'free': mem_free,
+            'available': mem_available,
+            'used': mem_used
+        }
+        data["memory_info"] = memory_info
+        return data
+
 
     
     
@@ -149,56 +211,6 @@ if __name__ == '__main__': # Only for testing
 
 
 
-def get_machine_hardware_info(): # TODO : Has to be merged with the new class. Not sur how to do it yet
-    # Get system temperature
-    counter = 0
-    data = {}
-
-    # Machine name 
-    with open('/etc/hostname', 'r') as f:
-        data["machine_name"] = f.read().strip()
-    
-    #FIXME Machine IP address ## Has to be fixed, only display the local IP address
-    with open('/etc/hosts', 'r') as f:
-        data["machine_ip"] = f.read().split()[0]
-
-
-    temps = {}
-    while True :
-        try:
-            temp_name = ''
-            temp_temp = 0
-            with open(f'/sys/class/thermal/thermal_zone{counter}/type', 'r') as type_file:
-                temp_name = type_file.read().strip()
-            with open(f'/sys/class/thermal/thermal_zone{counter}/temp', 'r') as temp_file:
-                temp_temp = float(temp_file.read()) / 1000
-            temps[temp_name] = temp_temp
-            counter += 1
-        except FileNotFoundError:
-            break
-    data["temperature"] = temps
-    
-    with open('/proc/stat') as f:
-        fields = [float(column) for column in f.readline().strip().split()[1:]]
-    idle, total = fields[3], sum(fields)
-    cpu_usage = round(100 * (1.0 - (float)(idle / total)), 2)
-    data["cpu_usage"] = cpu_usage
-
-    # Get system memory
-    with open('/proc/meminfo') as f:
-        meminfo = dict((i.split()[0].rstrip(':'), int(i.split()[1])) for i in f.readlines())
-    mem_total = meminfo['MemTotal']
-    mem_free = meminfo['MemFree']
-    mem_available = meminfo['MemAvailable']
-    mem_used = round(100 * (1.0 - (float)(mem_available / mem_total)), 2)
-    memory_info = {
-        'total': mem_total,
-        'free': mem_free,
-        'available': mem_available,
-        'used': mem_used
-    }
-    data["memory_info"] = memory_info
-    return data
 
 
 
