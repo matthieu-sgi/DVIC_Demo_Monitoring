@@ -3,6 +3,7 @@
 # import Queue
 from multiprocessing import Queue
 
+import datetime
 import subprocess
 import threading
 import os
@@ -13,13 +14,25 @@ import logging #### Only for testing
 
 class DataAggregator():
     def __init__(self):
-        pass
+        self.running = False
+        self.queue = Queue()
 
-    def lauch(self):
+    def _thread_target(self):
+        '''Target for the thread'''
         raise NotImplementedError
 
+    def launch(self):
+        '''Launch the data aggregator'''      
+        self.running = True
+        self.thread = threading.Thread(target=self._thread_target, daemon=True)
+        self.thread.start()
+    
     def stop(self):
-        raise NotImplementedError
+        self.running = False
+        # Set a timeout to avoid blocking
+        self.thread.join(timeout=1)
+        self.process.kill()
+        self.process.wait()
         
 
     def get_logs(self):
@@ -40,34 +53,25 @@ class LogReader(DataAggregator):
         super().__init__()
         self.file_path = file_path
         self.journal_unit = journal_unit
-        self.process = None
+        self.process = self._define_process()
         self.thread = None
-        self.running = False
-
-        self.queue : Queue = Queue()
     
-    def read_loop(self)-> None:
-        '''Read the log file'''
+    def _define_process(self) -> subprocess.Popen:
+        '''Define the process to use'''
+        if self.file_path is not None:
+            self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        elif self.journal_unit is not None:
+            self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            raise Exception('No file path or journal unit specified')
 
+    
+    def _thread_target(self)-> None:
+        '''Read the log file'''
         while self.running:
             line = self.process.stdout.readline()
             if line:
                 self.queue.put(line.decode('utf-8').strip())
-    
-    def launch(self) -> None:
-        '''Launch the log reader'''
-        if self.file_path is not None:
-            logging.info(f'Launching log reader for {self.file_path}')
-            self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        elif self.journal_unit is not None:
-            logging.info(f'Launching log reader for {self.journal_unit}')
-            self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        else:
-            raise Exception('No file path or journal unit specified')
-        
-        self.running = True
-        self.thread = threading.Thread(target=self.read_loop, daemon=True)
-        self.thread.start()
 
     def get_type(self) -> str:
         '''Get the type of log reader'''
@@ -107,14 +111,6 @@ class LogReader(DataAggregator):
     def __len__(self):
         return self.queue.qsize()
     
-    def stop(self):
-        '''Stop the log reader'''
-        self.running = False
-        # Set a timeout to avoid blocking
-        self.thread.join(timeout=1)
-        self.process.kill()
-        self.process.wait()
-
 class LogReaderManager():
     def __init__(self) -> None:
         self.log_readers = []
@@ -141,12 +137,17 @@ class HardwareInfo(DataAggregator):
     def __init__(self):
         super().__init__()
         pass
+    
+    def _thread_target(self):
+        data = {}
+        data['machine_name'] = self._get_machine_name()
+        data['ip'] = self._get_ip()
+        data['temperature'] = self._get_temperature()
+        data['cpu_usage'] = self._get_cpu_usage()
+        data['memory_usage'] = self._get_memory_usage()
+        self.queue.put(data)
+    
 
-    def lauch(self):
-        pass
-
-    def stop(self):
-        pass
 
     def _get_machine_name(self) -> str:
         # Machine name
@@ -161,6 +162,7 @@ class HardwareInfo(DataAggregator):
         with open('/etc/hosts', 'r') as f:
             data = f.read().split()[0]
         return data
+    
 
     def _get_temperature(self) -> dict:
         '''Get the temperature of the machine'''
@@ -206,15 +208,16 @@ class HardwareInfo(DataAggregator):
     
     def get_logs(self) -> dict:
         data = {}
-        data['machine_name'] = self._get_machine_name()
-        data['ip'] = self._get_ip()
-        data['temperature'] = self._get_temperature()
-        data['cpu_usage'] = self._get_cpu_usage()
-        data['memory_usage'] = self._get_memory_usage()
-        return data
+        if not self.queue.empty():
+            temp = {}
+            while not self.queue.empty():
+                content = self.queue.get()
+                temp['content'] = content
+                data[ datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] = temp
+        
         
     # def _get_disk_usage(self) -> dict: 
-    # TODO : depends on the python version, if it's 3.3 or higher, use the shutil library if not use the psutil library
+    # TODO : depends on the python version, if it's 3.3 or higher, we could use shutil library of use general psutil library. Is it native ? 
     # 
     #     '''Get the disk usage'''
     #     disk_usage = {}
@@ -233,21 +236,19 @@ if __name__ == '__main__': # Only for testing
                         datefmt="%H:%M:%S")
     logging.info("Main    : before creating thread")
 
-    log_reader = LogReader(journal_unit='docker.service')
-    log_reader.launch()
+    hard = HardwareInfo()
+    hard.launch()
 
     try :
         while True:
             # logging.info(f'manual : {process.stdout.readline().decode("utf-8").strip()}')
-            logs = log_reader.get_logs()
+            logs = hard.get_logs()
             if logs:
                 logging.info(f'Logs : {logs}')
             continue
     except KeyboardInterrupt:
-        log_reader.running = False
-        log_reader.thread.join()
-        log_reader.process.kill()
-        log_reader.process.wait()
+        hard.stop()
+        logging.info('Main    : all done')
 
 
 

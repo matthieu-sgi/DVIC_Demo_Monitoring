@@ -3,9 +3,9 @@ version: '2'
 services:
   elk:
     image: sebp/elk
-    mem_limit: 8000m
-    memswap_limit: 1000m
-    mem_reservation: 4000m
+    mem_limit: 8000M
+    memswap_limit: 10000M
+    mem_reservation: 4000M
     ports:
       - "5601:5601"
       - "9200:9200"
