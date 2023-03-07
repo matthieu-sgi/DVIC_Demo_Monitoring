@@ -9,12 +9,12 @@ import os
 from dvic_log_server.connection import Connection
 from dvic_log_server.network.packets import Packet, decode as decode_packet
 from dvic_log_server.utils import singleton
-
+from dvic_log_server.utils.crypto import CryptClient, CryptPhonebook
 
 app = FastAPI()
 
 @singleton
-class ConnectionManager:
+class ConnectionManager(CryptPhonebook):
     def __init__(self):
         self.connections: dict[str, Connection] = {}
         self.log_path = os.path.dirname(os.path.realpath(__file__))
@@ -40,6 +40,9 @@ class ConnectionManager:
             return
         self.connections[uid] = connection
 
+    def get_public_key(self, uid: str) -> str:
+        return "" #TODO return public key
+
     def __getitem__(self, uid: str) -> Connection:
         if uid not in self.connections: return None
         return self.connections[uid]
@@ -62,10 +65,19 @@ def installer_download(install_token: str):
 
     pass
     
-@app.websocket("/ws/{uid}/{conn_token}") #TODO identifier in initial request?
-async def websocket_endpoint(websocket: WebSocket, uid: str):
+@app.websocket("/ws/{token}") #TODO identifier in initial request?
+async def websocket_endpoint(websocket: WebSocket, token: str):
     # uid = str(uuid.uuid4()) # uid  generated here, to auth a connection. #TODO use preset uuid to handle connection reset
-    #TODO add authentication later
+    cry = CryptClient()
+    uid, packet_ok = cry.verify_initial_packet(token, ConnectionManager())
+
+    await websocket.accept()
+    if not packet_ok or False: #FIXME testing
+        print(f'[CONNECTION] ({uid}) ({websocket.client.host}) Connection token rejected')
+        websocket.send_text(f'Connection token rejected.')
+        await websocket.close()
+        return
+
     conn = Connection(websocket, uid)
     ConnectionManager()[uid] = conn 
 
@@ -85,7 +97,6 @@ async def websocket_endpoint(websocket: WebSocket, uid: str):
 
     loop = asyncio.get_running_loop()
     try:
-        await websocket.accept()      
         print(f"[{uid}] Accepted connection from {websocket.client.host}")
 
         # rect = loop.create_task(receive_packets())

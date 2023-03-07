@@ -4,6 +4,7 @@ import random
 import string
 import base64
 import os
+from abc import ABC, abstractmethod
 
 from ecdsa import SigningKey, VerifyingKey
 import ecdsa
@@ -15,6 +16,11 @@ import ecdsa
 
 UUID_LEN = 36
 SALT_LEN = 16
+
+class CryptPhonebook(ABC):
+     @abstractmethod
+     def get_public_key(self, uid: str) -> str: ...
+
 
 class CryptClient():
     def __init__(self, public_key: Union[Path, bytes] = None, private_key: Union[Path, str] = None) -> None:
@@ -61,11 +67,13 @@ class CryptClient():
         signature = client.encode_b64_for_url(self.sign(plaintext))
         return f'{plaintext}{signature}'
     
-    def verify_initial_packet(self, pck: str, pub_key: str) -> bool:
-        key = VerifyingKey.from_pem(self._read_key(pub_key))
+    def verify_initial_packet(self, pck: str, phone_book: CryptPhonebook) -> tuple[str, bool]:
         CUTOFF = SALT_LEN + UUID_LEN
         plaintext, signature = pck[:CUTOFF], pck[CUTOFF:]
-        return self.verify(key, plaintext, self.decode_b64_from_url(signature))
+        uid = plaintext[:UUID_LEN]
+        key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))
+
+        return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature))
     
     def encode_b64_for_url(self, b64: str):
         # '+/=' > '*_-'
@@ -76,6 +84,7 @@ class CryptClient():
 
 if __name__ == '__main__':
     import uuid
+    #! fixme: cannot crete salt on client side because of replay attacks
     client = CryptClient(private_key='./testing/client1.private')
     u = 'e118857e-3732-4e58-aa9c-56685c6a6492' # str(uuid.uuid4())
     pck = client.craft_initial_token(u)
