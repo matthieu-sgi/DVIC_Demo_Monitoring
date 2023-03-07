@@ -110,7 +110,8 @@ class LogReader(DataAggregator):
     def stop(self):
         '''Stop the log reader'''
         self.running = False
-        self.thread.join()
+        # Set a timeout to avoid blocking
+        self.thread.join(timeout=1)
         self.process.kill()
         self.process.wait()
 
