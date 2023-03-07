@@ -72,7 +72,7 @@ class CryptClient():
         plaintext, signature = pck[:CUTOFF], pck[CUTOFF:]
         uid = plaintext[:UUID_LEN]
         key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))
-        
+
         return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature))
     
     def encode_b64_for_url(self, b64: str):
@@ -84,6 +84,7 @@ class CryptClient():
 
 if __name__ == '__main__':
     import uuid
+    #! fixme: cannot crete salt on client side because of replay attacks
     client = CryptClient(private_key='./testing/client1.private')
     u = 'e118857e-3732-4e58-aa9c-56685c6a6492' # str(uuid.uuid4())
     pck = client.craft_initial_token(u)
