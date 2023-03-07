@@ -115,7 +115,7 @@ class LogReader(DataAggregator):
         self.process.wait()
 
 class LogReaderManager():
-    def __init__(self):
+    def __init__(self) -> None:
         self.log_readers = []
     
     def add_log_reader(self, log_reader : LogReader) -> None:
