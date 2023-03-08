@@ -160,14 +160,15 @@ class HardwareInfo(DataAggregator):
 
 
     def _get_machine_name(self) -> str:
-        # Machine name
+        '''Get the machine name'''
         data = ''
         with open('/etc/hostname', 'r') as f:
             data = f.read().strip()
         return data
 
     def _get_ip(self) -> str:
-        # Machine IP address # FIXME: Has to be fixed, only display the local IP address
+        '''Get the IP address of the machine'''
+        # FIXME: Has to be fixed, only display the local IP address
         data = ''
         with open('/etc/hosts', 'r') as f:
             data = f.read().split()[0]
@@ -217,6 +218,7 @@ class HardwareInfo(DataAggregator):
         return memory_info
     
     def get_logs(self) -> dict:
+        '''Get the logs from the queue. This empty the queue'''
         data = {}
         if not self.queue.empty():
             temp = {}
