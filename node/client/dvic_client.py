@@ -30,7 +30,7 @@ class DVICClient(AbstractDVICNode):
         
     def _send_thread_target(self):
         try:
-            print("Starting send thread")
+            print("Starting send thread") #FIXME remove
             while True:
                 pck: Packet = self.send_queue.get()
                 self.ws.send(pck.encode())
@@ -60,13 +60,13 @@ class DVICClient(AbstractDVICNode):
         atexit.register(self.exit_handler)
         Thread(target=self._send_thread_target,  daemon=True).start()
         Thread(target=self._recpt_thread_target, daemon=True).start()
-        input()
+        input() #TODO local console?
 
     # def on_open(self, ws: WebSocketApp):
     #     logging.info(f"[CONNECTION] Connected to {self.url}")
 
     def _recpt_thread_target(self):
-        print('Receiving...')
+        print('Receiving...') #FIXME remove
         while True:
             try:
                 data = self.ws.recv()
@@ -127,6 +127,6 @@ class DVICClient(AbstractDVICNode):
 
 
 if __name__ == '__main__':
-    print(f'[PRGM] Starting DVIC Demo Watcher Node')
+    print(f'[STARTUP] Starting DVIC Demo Watcher Node')
     client = DVICClient()
     client.run()

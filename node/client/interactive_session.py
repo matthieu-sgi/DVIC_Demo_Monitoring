@@ -43,20 +43,19 @@ class InteractiveSession:
 
     def run(self) -> int:
         logging.info(f'[SESSION] Starting session {self.uid} with cmd {self.target_executable}')
+        msg = None # termination message
         try:
             master, slave = pty.openpty() # ptty for session handling
             self.process_obj = Popen([self.target_executable], shell=False, start_new_session=True, stdin=slave, stdout=slave, stderr=slave, bufsize=0) # notice buffering, session_start
             Thread(target=self._read_process,      args=(master,), daemon=True).start()
-            Thread(target=self._read_input_buffer, args=(master,), daemon=True).start()
-            while True:
-                try: rt = self.process_obj.wait(1); break
-                except subprocess.TimeoutExpired: pass
-            msg = None
+            Thread(target=self._read_input_buffer, args=(master,), daemon=True).start()            
+            self.process_obj.wait() # wait here for process termination
         except Exception as e:
             traceback.print_exc()
-            rt = -1
             msg = f'Exception {type(e)} in session: {str(e)}'
-        # Teardown
+
+        # Process exited, teardown the session
+        rt = self.process_obj.returncode
         print(f'[SESSION] Session {self.uid} terminated with code {rt}')
         self.running = False
         self._send_termination(rt, msg)

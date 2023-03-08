@@ -16,11 +16,14 @@ import ecdsa
 
 UUID_LEN = 36
 SALT_LEN = 16
+CUTOFF   = SALT_LEN + UUID_LEN
 
 class CryptPhonebook(ABC):
      @abstractmethod
      def get_public_key(self, uid: str) -> str: ...
 
+     @abstractmethod
+     def get_client_salt(self, uid: str) -> str: ...
 
 class CryptClient():
     def __init__(self, public_key: Union[Path, bytes] = None, private_key: Union[Path, str] = None) -> None:
@@ -68,7 +71,6 @@ class CryptClient():
         return f'{plaintext}{signature}'
     
     def verify_initial_packet(self, pck: str, phone_book: CryptPhonebook) -> tuple[str, bool]:
-        CUTOFF = SALT_LEN + UUID_LEN
         plaintext, signature = pck[:CUTOFF], pck[CUTOFF:]
         uid = plaintext[:UUID_LEN]
         key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))

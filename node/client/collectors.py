@@ -13,9 +13,7 @@ import logging
 import time
 
 
-
-
-class DataAggregator():
+class DataAggregator(): #FIXME @Matthieu: make abstract class
     '''Class used to handle the data aggregation'''
 
     def __init__(self):
@@ -23,9 +21,9 @@ class DataAggregator():
         self.process : subprocess.Popen = None
         self.queue = Queue()
 
-    def _thread_target(self):
+    def _thread_target(self): #FIXME @Matthieu mark as abstract
         '''Target for the thread'''
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def launch(self):
         '''Launch the data aggregator
@@ -36,16 +34,20 @@ class DataAggregator():
     
     def stop(self):
         '''Stop the data aggregator, kill the thread and the process (if any)'''
+        #FIXME @Matthieu The method logic is not sound
+        #                You must check if running is True before proceeding with the method
         self.running = False
         # Set a timeout to avoid blocking
         if self.process is not None:
             self.process.kill()
+        #FIXME @Matthieu: logic error below, why do you wait for the process again? what if there is a TimeoutException
+        #                 The thread and process may not be used at the same time.                         
         self.thread.join(timeout=1)
         if self.process is not None:
             self.process.wait(timeout=1)
         
 
-    def get_logs(self):
+    def get_logs(self): #FIXME @Matthieu, all DataAggregator dont gather logs, remove
         '''Get the logs from the log readers'''
         raise NotImplementedError
 
@@ -64,7 +66,7 @@ class LogReader(DataAggregator):
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = self._define_process()
-        self.thread = None
+        self.thread = None #FIXME @Matthieu the thread object is already defined
     
     def _define_process(self) -> subprocess.Popen:
         '''Define the process to use'''
@@ -94,6 +96,7 @@ class LogReader(DataAggregator):
     
     def get_logs(self) -> dict:
         '''Get the logs from the queue'''
+        # FIXME @Matthieu comment method logic, detail docstring and use subroutines
         data = {}
         if not self.queue.empty():
             if self.get_type() == 'file':
@@ -149,6 +152,7 @@ class HardwareInfo(DataAggregator):
     
     def _thread_target(self):
         while self.running :
+            #FIXME @Matthieu loop too fast
             data = {}
             data['machine_name'] = self._get_machine_name()
             data['ip'] = self._get_ip()
