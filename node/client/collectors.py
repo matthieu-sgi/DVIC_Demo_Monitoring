@@ -7,14 +7,20 @@ import datetime
 import subprocess
 import threading
 import os
-import logging #### Only for testing
+
+#################### Only for testing ####################
+import logging
+import time
 
 
 
 
 class DataAggregator():
+    '''Class used to handle the data aggregation'''
+
     def __init__(self):
         self.running = False
+        self.process : subprocess.Popen = None
         self.queue = Queue()
 
     def _thread_target(self):
@@ -22,17 +28,21 @@ class DataAggregator():
         raise NotImplementedError
 
     def launch(self):
-        '''Launch the data aggregator'''      
+        '''Launch the data aggregator
+        Create a thread to read the data.'''      
         self.running = True
         self.thread = threading.Thread(target=self._thread_target, daemon=True)
         self.thread.start()
     
     def stop(self):
+        '''Stop the data aggregator, kill the thread and the process (if any)'''
         self.running = False
         # Set a timeout to avoid blocking
+        if self.process is not None:
+            self.process.kill()
         self.thread.join(timeout=1)
-        self.process.kill()
-        self.process.wait()
+        if self.process is not None:
+            self.process.wait(timeout=1)
         
 
     def get_logs(self):
@@ -136,16 +146,16 @@ class LogReaderManager():
 class HardwareInfo(DataAggregator):
     def __init__(self):
         super().__init__()
-        pass
     
     def _thread_target(self):
-        data = {}
-        data['machine_name'] = self._get_machine_name()
-        data['ip'] = self._get_ip()
-        data['temperature'] = self._get_temperature()
-        data['cpu_usage'] = self._get_cpu_usage()
-        data['memory_usage'] = self._get_memory_usage()
-        self.queue.put(data)
+        while self.running :
+            data = {}
+            data['machine_name'] = self._get_machine_name()
+            data['ip'] = self._get_ip()
+            data['temperature'] = self._get_temperature()
+            data['cpu_usage'] = self._get_cpu_usage()
+            data['memory_usage'] = self._get_memory_usage()
+            self.queue.put(data)    
     
 
 
@@ -214,6 +224,7 @@ class HardwareInfo(DataAggregator):
                 content = self.queue.get()
                 temp['content'] = content
                 data[ datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] = temp
+        return data
         
         
     # def _get_disk_usage(self) -> dict: 
@@ -245,6 +256,7 @@ if __name__ == '__main__': # Only for testing
             logs = hard.get_logs()
             if logs:
                 logging.info(f'Logs : {logs}')
+            time.sleep(1)
             continue
     except KeyboardInterrupt:
         hard.stop()
