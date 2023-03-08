@@ -2,7 +2,7 @@
 
 import unittest
 
-from server.database.elk_stack.database_modules.database_driver import Database
+from server.dvic_log_server.database_driver import Database
 
 class TestDatabaseConnection(unittest.TestCase):
     def setUp(self):
