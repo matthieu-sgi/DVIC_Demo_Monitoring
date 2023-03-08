@@ -3,7 +3,7 @@
 from elasticsearch import Elasticsearch
 
 
-class Database:
+class ElasticConnector:
 
     def __init__(self, host: str, port: int, index: str = None):
         self.host = host
@@ -52,9 +52,10 @@ class Database:
 if __name__ == '__main__':
     db = Database('localhost', 9200, 'test_index')
     print(db.test_connection())
-    print(db.delete_all())
-    print("------------------")
-    print(db.get_all())
-    print("------------------")
-    db.insert({'name': 'test'})
-    print(db.get_all())
+    # print(db.delete_all())
+    
+    # print("------------------")
+    # print(db.get_all())
+    # print("------------------")
+    # db.insert({'name': 'test'})
+    # print(db.get_all())

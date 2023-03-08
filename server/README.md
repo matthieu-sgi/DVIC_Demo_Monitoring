@@ -9,5 +9,3 @@ The roadmap for the central server is in the [general readme](../README.md)
 > **Note**
 >
 > Most likely going with ELK for log keeping and Influx for state
-
-TODO : Reorganize this the docker-compose file. This one is for the database only
