@@ -1,27 +1,29 @@
 '''Collectors for the DVIC node.'''
 
-# import Queue
+from abc import ABC, abstractmethod
 from multiprocessing import Queue
 
 import datetime
 import subprocess
 import threading
+import time
 import os
 
 #################### Only for testing ####################
 import logging
-import time
 
 
-class DataAggregator(): #FIXME @Matthieu: make abstract class
+class DataAggregator(ABC): 
     '''Class used to handle the data aggregation'''
 
     def __init__(self):
         self.running = False
         self.process : subprocess.Popen = None
+        self.thread : threading.Thread = None
         self.queue = Queue()
 
-    def _thread_target(self): #FIXME @Matthieu mark as abstract
+    @abstractmethod
+    def _thread_target(self):
         '''Target for the thread'''
         raise NotImplementedError()
 
@@ -34,25 +36,15 @@ class DataAggregator(): #FIXME @Matthieu: make abstract class
     
     def stop(self):
         '''Stop the data aggregator, kill the thread and the process (if any)'''
-        #FIXME @Matthieu The method logic is not sound
-        #                You must check if running is True before proceeding with the method
-        self.running = False
-        # Set a timeout to avoid blocking
-        if self.process is not None:
-            self.process.kill()
-        #FIXME @Matthieu: logic error below, why do you wait for the process again? what if there is a TimeoutException
-        #                 The thread and process may not be used at the same time.                         
-        self.thread.join(timeout=1)
-        if self.process is not None:
-            self.process.wait(timeout=1)
+        if self.running:
+            self.running = False
+            # Set a timeout to avoid blocking
+            if self.process is not None:
+                self.process.kill()
+                        
+            self.thread.join(timeout=1)
+
         
-
-    def get_logs(self): #FIXME @Matthieu, all DataAggregator dont gather logs, remove
-        '''Get the logs from the log readers'''
-        raise NotImplementedError
-
-
-
 
 
 class LogReader(DataAggregator):
@@ -66,7 +58,6 @@ class LogReader(DataAggregator):
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = self._define_process()
-        self.thread = None #FIXME @Matthieu the thread object is already defined
     
     def _define_process(self) -> subprocess.Popen:
         '''Define the process to use'''
@@ -95,33 +86,56 @@ class LogReader(DataAggregator):
             return 'unknown'
     
     def get_logs(self) -> dict:
-        '''Get the logs from the queue'''
-        # FIXME @Matthieu comment method logic, detail docstring and use subroutines
+        '''Get the logs from the queue
+        Return a dict with the logs
+        
+        ----- Return -----
+        data : dict
+        
+        ----- Example -----
+        if the log reader is a file reader:
+        data = {
+            'path' : '/var/log/syslog',
+            0 : {
+                'content' : 'Jan  1 00:00:00 machine_name message'
+            }}
+        if the log reader is a journal reader:
+        data = {
+            'unit' : 'systemd-journald',
+            0 : {
+                'date' : 'Jan  1',
+                'time' : '00:00:00',
+                'machine' : 'machine_name',
+                'content' : 'message'
+            }}
+            '''
+        # FIXME @Matthieu use subroutines
         data = {}
-        if not self.queue.empty():
-            if self.get_type() == 'file':
-                data['path'] = self.file_path
+        if not self.queue.empty(): # Verify if the queue is not empty
+            if self.get_type() == 'file': # Verify the type of log reader
+                data['path'] = self.file_path # Add the path to the dict
             elif self.get_type() == 'journal':
-                data['unit'] = self.journal_unit
+                data['unit'] = self.journal_unit # Add the unit to the dict
             temp = {}
-            size = self.queue.qsize()
-            # print(self.queue.qsize())
-            while not self.queue.empty():
-                content = self.queue.get()
-                if self.get_type() == 'file':
-                    temp['content'] = content
-                elif self.get_type() == 'journal':
-                    content = content.split(' ')
-                    temp['date'] = ' '.join(content[0:2])
-                    temp['time'] = content[2]
-                    temp['machine'] = content[3]
-                    temp['content'] = ' '.join(content[4:])
+            size = self.queue.qsize() # Get the size of the queue, in order to give ids to the logs
+            while not self.queue.empty(): # While the queue is not empty
+                content = self.queue.get() # Get the content of the first log
+                if self.get_type() == 'file': # Verify the type of log reader
+                    temp['content'] = content # Add the content to the dict, 'content' is the key
+                elif self.get_type() == 'journal': 
+                    content = content.split(' ') # Split the content by spaces
+                    temp['date'] = ' '.join(content[0:2]) # Add the date to the dict, 'date' is the key
+                    temp['time'] = content[2] # Add the time to the dict, 'time' is the key
+                    temp['machine'] = content[3] # Add the machine name to the dict, 'machine' is the key
+                    temp['content'] = ' '.join(content[4:]) # Add the content to the dict, 'content' is the key
 
-                
-                data[size - self.queue.qsize()] = temp
+                # Add the dict to the data dict, the id (total queue_size- actual queue size ) is the key
+                # Might be changed because it's not very efficient, maybe replace the id by a timestamp
+                data[size - self.queue.qsize()] = temp 
         return data
     
-    def __len__(self):
+    def __len__(self) -> int:
+        '''Get the size of the queue'''
         return self.queue.qsize()
     
 class LogReaderManager():
@@ -152,14 +166,14 @@ class HardwareInfo(DataAggregator):
     
     def _thread_target(self):
         while self.running :
-            #FIXME @Matthieu loop too fast
             data = {}
             data['machine_name'] = self._get_machine_name()
             data['ip'] = self._get_ip()
             data['temperature'] = self._get_temperature()
             data['cpu_usage'] = self._get_cpu_usage()
             data['memory_usage'] = self._get_memory_usage()
-            self.queue.put(data)    
+            self.queue.put(data)
+            time.sleep(10) #FIXME @gregor : waiting enough ?
     
 
 
