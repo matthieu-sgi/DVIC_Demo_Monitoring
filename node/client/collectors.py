@@ -26,6 +26,11 @@ class DataAggregator(ABC):
     def _thread_target(self):
         '''Target for the thread'''
         raise NotImplementedError()
+    
+    @abstractmethod
+    def get_logs(self) -> dict:
+        '''Get the logs from the queue'''
+        raise NotImplementedError()
 
     def launch(self):
         '''Launch the data aggregator
@@ -53,7 +58,7 @@ class LogReader(DataAggregator):
         file_path : str = None
         journal_unit : str = None
     '''
-    def __init__(self, *, file_path : str = None, journal_unit : str = None, hardware_info : str = None) -> None:
+    def __init__(self, *, file_path : str = None, journal_unit : str = None) -> None:
         super().__init__()
         self.file_path = file_path
         self.journal_unit = journal_unit
@@ -138,26 +143,7 @@ class LogReader(DataAggregator):
         '''Get the size of the queue'''
         return self.queue.qsize()
     
-class LogReaderManager():
-    def __init__(self) -> None:
-        self.log_readers = []
-    
-    def add_log_reader(self, log_reader : LogReader) -> None:
-        self.log_readers.append(log_reader)
 
-    def launch_reader(self, log_reader : LogReader) -> None:
-        log_reader.launch()
-    
-    def launch_all(self) -> None:
-        for log_reader in self.log_readers:
-            self.launch_reader(log_reader)
-
-    def stop_all(self) -> None:
-        for log_reader in self.log_readers:
-            log_reader.stop()
-    
-    def get_logs(self, log_reader : LogReader) -> dict: #FIXME : Has to be changed depending on the usage
-        return log_reader.get_logs()
     
 
 class HardwareInfo(DataAggregator):
@@ -173,7 +159,7 @@ class HardwareInfo(DataAggregator):
             data['cpu_usage'] = self._get_cpu_usage()
             data['memory_usage'] = self._get_memory_usage()
             self.queue.put(data)
-            time.sleep(10) #FIXME @gregor : waiting enough ?
+            time.sleep(10)
     
 
 
@@ -243,7 +229,7 @@ class HardwareInfo(DataAggregator):
             while not self.queue.empty():
                 content = self.queue.get()
                 temp['content'] = content
-                data[ datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] = temp
+                data[datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] = temp
         return data
         
         
@@ -255,10 +241,34 @@ class HardwareInfo(DataAggregator):
     #     for partition in psutil.disk_partitions():
     #         if partition.fstype == 'ext4':
     #             disk_usage[partition.mountpoint] = psutil.disk_usage(partition.mountpoint)
-    #     return disk_usage
+    #    return disk_usage
     
     
 
+class DataAggregatorManager(): # ? What do you think about the changes of this class ? Feel better
+    def __init__(self) -> None:
+        self.data_aggregators = []
+    
+    def add_data_aggregator(self, data_aggregators : DataAggregator) -> None:
+        self.log_readers.append(data_aggregators)
+    
+    def launch_data_aggregator(self, data_aggregator : DataAggregator) -> None:
+        data_aggregator.launch()
+    
+    def launch_all(self) -> None:
+        for data_aggregator in self.data_aggregators:
+            self.launch_data_aggregator(data_aggregator)
+    
+    def stop_all(self) -> None:
+        for data_aggregator in self.data_aggregators:
+            data_aggregator.stop()
+    
+    def __get__(self, index : int) -> DataAggregator:
+        return self.data_aggregators[index]
+
+    def __set__(self, index : int, data_aggregator : DataAggregator) -> None:
+        self.data_aggregators[index] = data_aggregator
+    
     
 if __name__ == '__main__': # Only for testing
 
