@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from multiprocessing import Queue
+from queue import Empty
 
 import datetime
 import subprocess
@@ -28,7 +29,7 @@ class DataAggregator(ABC):
         raise NotImplementedError()
     
     @abstractmethod
-    def get_logs(self) -> dict:
+    def get_logs(self) -> dict: #! FIXME This should be in the LogAggregator, its probably too general for the base class
         '''Get the logs from the queue'''
         raise NotImplementedError()
 
@@ -67,9 +68,9 @@ class LogReader(DataAggregator):
     def _define_process(self) -> subprocess.Popen:
         '''Define the process to use'''
         if self.file_path is not None:
-            self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #TODO @Matthieu just in case tail is actually not installed, use a pure python logic
         elif self.journal_unit is not None:
-            self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #NOTE journaltcl is installed on all systemd managed machines
         else:
             raise Exception('No file path or journal unit specified')
 
@@ -81,62 +82,68 @@ class LogReader(DataAggregator):
             if line:
                 self.queue.put(line.decode('utf-8').strip())
 
-    def get_type(self) -> str:
+    def get_type(self) -> str: #TODO @Matthieu this is a good use case for an Enum
         '''Get the type of log reader'''
         if self.file_path is not None:
             return 'file'
         elif self.journal_unit is not None:
             return 'journal'
         else:
-            return 'unknown'
+            return 'unknown' #FIXME by what you have in _define_process this case should not happen
     
-    def get_logs(self) -> dict:
-        '''Get the logs from the queue
-        Return a dict with the logs
-        
-        ----- Return -----
-        data : dict
-        
-        ----- Example -----
-        if the log reader is a file reader:
-        data = {
-            'path' : '/var/log/syslog',
-            0 : {
-                'content' : 'Jan  1 00:00:00 machine_name message'
-            }}
-        if the log reader is a journal reader:
-        data = {
-            'unit' : 'systemd-journald',
-            0 : {
-                'date' : 'Jan  1',
-                'time' : '00:00:00',
-                'machine' : 'machine_name',
-                'content' : 'message'
-            }}
-            '''
-        # FIXME @Matthieu use subroutines
-        data = {}
-        if not self.queue.empty(): # Verify if the queue is not empty
-            if self.get_type() == 'file': # Verify the type of log reader
-                data['path'] = self.file_path # Add the path to the dict
-            elif self.get_type() == 'journal':
-                data['unit'] = self.journal_unit # Add the unit to the dict
-            temp = {}
-            size = self.queue.qsize() # Get the size of the queue, in order to give ids to the logs
-            while not self.queue.empty(): # While the queue is not empty
-                content = self.queue.get() # Get the content of the first log
-                if self.get_type() == 'file': # Verify the type of log reader
-                    temp['content'] = content # Add the content to the dict, 'content' is the key
-                elif self.get_type() == 'journal': 
-                    content = content.split(' ') # Split the content by spaces
-                    temp['date'] = ' '.join(content[0:2]) # Add the date to the dict, 'date' is the key
-                    temp['time'] = content[2] # Add the time to the dict, 'time' is the key
-                    temp['machine'] = content[3] # Add the machine name to the dict, 'machine' is the key
-                    temp['content'] = ' '.join(content[4:]) # Add the content to the dict, 'content' is the key
 
-                # Add the dict to the data dict, the id (total queue_size- actual queue size ) is the key
-                # Might be changed because it's not very efficient, maybe replace the id by a timestamp
-                data[size - self.queue.qsize()] = temp 
+    def _get_reader_type_with_target(self) -> tuple[str]:
+        if self.file_path is not None:
+            return 'file', self.file_path
+        elif self.journal_unit is not None:
+            return 'journal', self.journal_unit
+        else:
+            raise RuntimeError()
+
+    def get_logs(self) -> dict:
+        """Get the logs from the queue
+        Return a dict with the logs
+
+        Returns
+        -------
+        dict
+            The data collected form the log
+
+        The data output looks like
+        ```
+        {
+            'kind': 'file or systemd' 
+            'name' : '/var/log/syslog',
+            'logs' : [   
+                {
+                    'value' : 'A raw log message'
+                    'timestamp': "<record_timestamp>"
+                }
+            ]
+        }
+        ```
+
+        Where `kind` can be "file" if the log is watching a file or "systemd" if the object is watching a systemd unit
+        `logs` can contain multiple lines
+
+        """
+        if self.queue.empty(): return {}
+
+        kind, name = self._get_reader_type_with_target()
+        data = {'kind': kind, 'name': name, 'logs': []}
+        
+        #! NOTE @Matthieu be advised that queue.empty() is NOT thread safe and unreliable https://docs.python.org/3/library/queue.html#queue.Queue.empty
+        
+        try:
+            while self.queue.get_nowait(): 
+                content = self.queue.get() 
+                temp = {'timestamp': time.time()}
+                if self.get_type() == 'journal': 
+                    content = ' '.join(content.split(' ')[4:]) 
+                temp['content'] = content
+                data['logs'].append(temp)
+        except Empty: pass
+
         return data
     
     def __len__(self) -> int:
@@ -222,6 +229,7 @@ class HardwareInfo(DataAggregator):
         return memory_info
     
     def get_logs(self) -> dict:
+        #! FIXME @Matthieu no need to implement this function "get_logs" should be used to get actual logs
         '''Get the logs from the queue. This empty the queue'''
         data = {}
         if not self.queue.empty():
