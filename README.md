@@ -67,16 +67,17 @@ Information types:
 ### Network
 
 - [x] Websocket from node to central server
-- [ ] Bring back online the connection.
+- [x] Bring back online the connection.
 - [x] Define communication protocol
 
 ### Node
 
 - [x] Execute command received from central server
 - [x] Send data to central server
-- [ ] Gather data from hardware and soft sources (syslog, t° etc)
+- [x] Gather data from hardware and soft sources (syslog, t° etc)
 - [ ] Read log files from /tmp
 - [ ] Inspect docker containers and read /tmp from there
+
 - [ ] Self-update from central server request
 - [ ] Automatic installation
 
@@ -87,7 +88,7 @@ Information types:
 - [ ] Choose database for log
 - [x] Choose log format
 - [ ] Keep log history in database 
-- [ ] Expose API for dashboard (node state, last logs etc)
+- [x] Expose API for dashboard (node state, last logs etc)
 - [ ] Terminal session from dashboard
 
 ### Libraries
