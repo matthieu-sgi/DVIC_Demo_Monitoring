@@ -104,17 +104,6 @@ class DVICClient(AbstractDVICNode):
 
     #TODO @Matthieu implement the rest of the handlers
    
-    # def handle_server_message(self):
-    #     message = self.receive_json()
-    #     print(f'Message received: {message}')
-    #     if message['type'] in self.MESSAGE_TYPES_CLIENT:
-    #         if self.MESSAGE_TYPES_CLIENT[message['type']] is not None:
-    #             self.send_json(self.MESSAGE_TYPES_CLIENT[message['type']](message['data']))
-    #         else:
-    #             print(f'No callback function for message type {message["type"]}')
-    #     else:
-    #         print(f'Unknown message type {message["type"]}')
-
     
     def execute_shell_command(self, command: str) -> None:
         '''Execute a shell command on the DVIC node.'''

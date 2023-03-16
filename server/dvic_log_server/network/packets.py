@@ -13,6 +13,7 @@ PACKET_ID_MATCHING = {
     "hardware_state": "HardwareState",
     "log_entry": "LogEntry",
     "demo_proc_state": "DemoProcState",
+    "machine_log" : "MachineLog",
     "interactive_session": "InteractiveSession",
     "node_status": "NodeStatus"
 } # identifier -> str(class<Packet>)
@@ -130,6 +131,17 @@ class PacketLogEntry(Packet):
 class PacketDemoProcState(Packet):
     def __init__(self, data : dict) -> None:
         super().__init__("demo_proc_state")
+        self.data = data
+
+    def get_data(self) -> dict:
+        return self.data
+    
+    def set_data(self, data: dict) -> None:
+        self.data = data
+    
+class PacketMachineLog(Packet):
+    def __init__(self, data : dict) -> None:
+        super().__init__("machine_log")
         self.data = data
 
     def get_data(self) -> dict:

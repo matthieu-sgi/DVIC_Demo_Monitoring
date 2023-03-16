@@ -25,6 +25,8 @@ class ElasticConnector:
         self.port = port
         self.index = index
         self.es = Elasticsearch(f'http://{self.host}:{self.port}')
+        if not self.test_connection():
+            raise ConnectionError('Could not connect to database')
         if self.index is not None:
             self._create_index(self.index)
     
@@ -76,6 +78,10 @@ class ElasticConnector:
     def push_log(self, log: dict) -> None:
         '''Pushes log to database'''
         self.insert(log)
+    
+    def close(self) -> None:
+        '''Closes connection to database'''
+        self.es.close()
 
     
 if __name__ == '__main__':

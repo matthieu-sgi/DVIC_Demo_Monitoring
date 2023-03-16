@@ -3,9 +3,14 @@ from fastapi import WebSocket
 import asyncio
 from dvic_log_server.network.packets import *
 from multiprocessing import Queue
+from dvic_log_server.database_drivers import ElasticConnector
 
 from time import time
 from starlette.websockets import WebSocketState
+
+elk_host = 'localhost'
+elk_port = 9200
+
 
 class Connection:
     def __init__(self, ws: WebSocket, uid: str) -> None:
@@ -47,7 +52,15 @@ class Connection:
     # handlers
 
     def _handle_machine_hardware_state(self, pck: PacketHardwareState):
-        raise NotImplementedError()
+        '''Handle a hardware state packet'''
+        elk = ElasticConnector(elk_host,elk_port,index='machine_hardware_state')
+        elk.insert(pck.get_data())
+        elk.close()
+    
+    def _handle_machine_log(self, pck: PacketMachineLog):
+        elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
+        elk.insert(pck.get_data())
+        elk.close()
 
     def _handle_node_status(self, pck: PacketNodeStatus):
         from dvic_log_server.api import ConnectionManager #! fix this mess haiyaa
@@ -65,6 +78,14 @@ class Connection:
     def _handle_interactive_session(self, pck: PacketInteractiveSession):
         from dvic_log_server.interactive_sessions import InteractiveSession # defer import *shrug*
         InteractiveSession.handle_packet(self, pck)
+    
+    def _handle_log_entry(self, pck: PacketLogEntry):
+        '''Handle a log entry packet'''
+        raise NotImplementedError()
+    
+    def _handle_demo_proc_state(self, pck: PacketDemoProcState):
+        '''Handle a demo process state packet'''
+        raise NotImplementedError()
 
 class MachineConnection(Connection): #? usefull
     def __init__(self, ws: WebSocket) -> None:

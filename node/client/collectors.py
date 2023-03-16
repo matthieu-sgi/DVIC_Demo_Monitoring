@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from multiprocessing import Queue
 from queue import Empty
-from network.packets import Packet
+from network.packets import Packet, PacketHardwareState, PacketMachineLog
 
 
 import datetime
@@ -31,10 +31,6 @@ class DataAggregator(ABC):
         '''Target for the thread'''
         raise NotImplementedError()
     
-    @abstractmethod
-    def get_logs(self) -> dict: #! FIXME This should be in the LogAggregator, its probably too general for the base class
-        '''Get the logs from the queue'''
-        raise NotImplementedError()
 
     def launch(self):
         '''Launch the data aggregator
@@ -53,10 +49,10 @@ class DataAggregator(ABC):
                         
             self.thread.join(timeout=1)
     
+    @abstractmethod
     def create_packet(self):
         '''Create a packet with the data'''
-        self.packet
-        return self.packet
+        raise NotImplementedError()
 
         
 
@@ -68,10 +64,11 @@ class LogReader(DataAggregator):
         journal_unit : str = None
     '''
     def __init__(self, *, file_path : str = None, journal_unit : str = None) -> None:
-        super().__init__()
+        super().__init__('machine_log')
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = self._define_process()
+        self.packet = PacketMachineLog()
     
     def _define_process(self) -> subprocess.Popen:
         '''Define the process to use'''
@@ -90,14 +87,14 @@ class LogReader(DataAggregator):
             if line:
                 self.queue.put(line.decode('utf-8').strip())
 
-    def get_type(self) -> str: #TODO @Matthieu this is a good use case for an Enum
-        '''Get the type of log reader'''
-        if self.file_path is not None:
-            return 'file'
-        elif self.journal_unit is not None:
-            return 'journal'
-        else:
-            return 'unknown' #FIXME by what you have in _define_process this case should not happen
+    # def get_type(self) -> str: # ? @gregor this is nomore needed because of _get_reader_type_with_target right ?
+    #     '''Get the type of log reader'''
+    #     if self.file_path is not None:
+    #         return 'file'
+    #     elif self.journal_unit is not None:
+    #         return 'journal'
+    #     else:
+    #         return 'unknown' #FIXME by what you have in _define_process this case should not happen
     
 
     def _get_reader_type_with_target(self) -> tuple[str]:
@@ -143,8 +140,7 @@ class LogReader(DataAggregator):
         #! NOTE @Matthieu be advised that queue.empty() is NOT thread safe and unreliable https://docs.python.org/3/library/queue.html#queue.Queue.empty
         
         try:
-            while self.queue.get_nowait(): 
-                content = self.queue.get() 
+            while content := self.queue.get_nowait():
                 temp = {'timestamp': time.time()}
                 if self.get_type() == 'journal': 
                     content = ' '.join(content.split(' ')[4:]) 
@@ -157,13 +153,20 @@ class LogReader(DataAggregator):
     def __len__(self) -> int:
         '''Get the size of the queue'''
         return self.queue.qsize()
+
+    def create_packet(self, data) -> PacketMachineLog:
+        '''Create a packet with the data'''
+        self.packet.data = data
+        return self.packet
     
 
-    
+HARDWARE_INFO_ENUM = ['machine_name', 'ip', 'temperature', 'cpu_usage', 'memory_usage']
+
 
 class HardwareInfo(DataAggregator):
     def __init__(self):
         super().__init__()
+        self.packet = PacketHardwareState()
     
     def _thread_target(self):
         while self.running :
@@ -176,8 +179,6 @@ class HardwareInfo(DataAggregator):
             self.queue.put(data)
             time.sleep(10)
     
-
-
     def _get_machine_name(self) -> str:
         '''Get the machine name'''
         data = ''
@@ -236,17 +237,27 @@ class HardwareInfo(DataAggregator):
         }
         return memory_info
     
-    def get_logs(self) -> dict:
-        #! FIXME @Matthieu no need to implement this function "get_logs" should be used to get actual logs
+    def get_hardware_info(self,*, info : str = None) -> dict:
         '''Get the logs from the queue. This empty the queue'''
         data = {}
-        if not self.queue.empty():
-            temp = {}
-            while not self.queue.empty():
-                content = self.queue.get()
-                temp['content'] = content
-                data[datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")] = temp
-        return data
+        if self.queue.empty(): return data
+        if info is not None :
+            if info not in HARDWARE_INFO_ENUM:
+                raise ValueError(f'Invalid info {info}')
+            data = {'kind' : 'hardware_info', 'name' : info, 'logs' : []}
+            data['logs'] = self.queue.get_nowait()[info]
+            return data
+        else: #FIXME : Try to find a way to implement this the same way as the get_logs() method. {'kind' : 'hardware_info', 'name' : info, 'logs' : []]}
+            temp = self.queue.get_nowait()
+            oui = []
+            for key in temp.keys():
+                oui.append({'kind' : 'hardware_info', 'name' : key, 'logs' : temp[key]})
+            return oui[:]
+    
+    def create_packet(self, data) -> PacketHardwareState:
+        self.packet.set_data(data)
+        return self.packet
+
         
         
     # def _get_disk_usage(self) -> dict: 
@@ -263,7 +274,7 @@ class HardwareInfo(DataAggregator):
 
 class DataAggregatorManager(): # ? What do you think about the changes of this class ? Feel better
     def __init__(self) -> None:
-        self.data_aggregators = []
+        self.data_aggregators : list[DataAggregator] = []
     
     def add_data_aggregator(self, data_aggregators : DataAggregator) -> None:
         self.log_readers.append(data_aggregators)
@@ -298,8 +309,8 @@ if __name__ == '__main__': # Only for testing
 
     try :
         while True:
-            # logging.info(f'manual : {process.stdout.readline().decode("utf-8").strip()}')
-            logs = hard.get_logs()
+            logging.info('Main    : before getting logs')
+            logs = hard.get_hardware_info()
             if logs:
                 logging.info(f'Logs : {logs}')
             time.sleep(1)
