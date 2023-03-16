@@ -2,6 +2,8 @@
 
 from abc import ABC, abstractmethod
 from multiprocessing import Queue
+from network.packets import Packet
+
 
 import datetime
 import subprocess
@@ -21,6 +23,7 @@ class DataAggregator(ABC):
         self.process : subprocess.Popen = None
         self.thread : threading.Thread = None
         self.queue = Queue()
+        self.packet : Packet = None
 
     @abstractmethod
     def _thread_target(self):
@@ -48,6 +51,11 @@ class DataAggregator(ABC):
                 self.process.kill()
                         
             self.thread.join(timeout=1)
+    
+    def create_packet(self):
+        '''Create a packet with the data'''
+        self.packet
+        return self.packet
 
         
 

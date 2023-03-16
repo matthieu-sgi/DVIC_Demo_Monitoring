@@ -11,8 +11,6 @@ class DatabaseConnector(ABC):
         self.index = index    
 
 
-
-
 class ElasticConnector:
     '''Driver for ElasticSearch database
     
@@ -83,12 +81,5 @@ class ElasticConnector:
 if __name__ == '__main__':
     db = ElasticConnector('localhost', 9200, 'test_index')
     print(db.test_connection())
-    # print(db.delete_all())
-    # print(db.insert({'name': 'test'}))
     print(db.get_all())
-    # db.delete_all()
-    # print("------------------")
-    # print(db.get_all())
-    # print("------------------")
-    # db.insert({'name': 'test'})
-    # print(db.get_all())
+
