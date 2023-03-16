@@ -104,6 +104,7 @@ class DVICClient(AbstractDVICNode):
 
     #TODO @Matthieu implement the rest of the handlers
    
+
     
     def execute_shell_command(self, command: str) -> None:
         '''Execute a shell command on the DVIC node.'''

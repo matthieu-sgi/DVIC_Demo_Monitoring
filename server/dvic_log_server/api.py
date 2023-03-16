@@ -8,7 +8,7 @@ import os
 
 from dvic_log_server.connection import Connection
 from dvic_log_server.network.packets import Packet, decode as decode_packet
-from dvic_log_server.utils import singleton
+from dvic_log_server.utils.wrappers import singleton
 from dvic_log_server.utils.crypto import CryptClient, CryptPhonebook
 
 app = FastAPI()
