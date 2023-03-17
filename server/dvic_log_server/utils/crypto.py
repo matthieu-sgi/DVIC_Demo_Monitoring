@@ -35,9 +35,6 @@ class CryptClient():
         if private_key is not None:
             self.private_key: SigningKey = SigningKey.from_pem(self._read_key(private_key))
     
-        if self.disabled:
-            print(f'[CRYPTO] No public or private key, the crypto module is therefore disabled')
-
     @property
     def disabled(self):
         return self.public_key is None and self.private_key is None
@@ -84,7 +81,6 @@ class CryptClient():
         plaintext, signature = pck[:CUTOFF], pck[CUTOFF:]
         uid = plaintext[:UUID_LEN]
         if not phone_book.is_secure_auth_enabled():
-            print(f'[AUTH] Bypass auth')
             return uid, True
         key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))
         return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature))

@@ -17,8 +17,6 @@ import os
 import logging
 
 
-client = DVICClient()
-
 class DataAggregator(ABC): 
     '''Class used to handle the data aggregation'''
 
@@ -66,12 +64,13 @@ class LogReader(DataAggregator):
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = self._define_process()
+        print("Proc started")
     
     def _define_process(self) -> subprocess.Popen:
         '''Define the process to use'''
 
         if self.file_path is not None:
-            return subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #TODO @Matthieu just in case tail is actually not installed, use a pure python logic
+            return subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True) #TODO @Matthieu just in case tail is actually not installed, use a pure python logic
         elif self.journal_unit is not None:
             return subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #NOTE journaltcl is installed on all systemd managed machines
         else:
@@ -94,12 +93,7 @@ class LogReader(DataAggregator):
         {
             'kind': 'file or systemd' 
             'name' : '/var/log/syslog',
-            'logs' : [   
-                {
-                    'value' : 'A raw log message'
-                    'timestamp': "<record_timestamp>"
-                }
-            ]
+            'log': value
         }
         ```
 
@@ -108,16 +102,14 @@ class LogReader(DataAggregator):
 
         """
         while self.running:
-            content = self.process.stdout.readline()
+            content = self.process.stdout.readline().decode()
             if content:
                 kind, name = self._get_reader_type_with_target()
-                data = {'kind': kind, 'name': name, 'logs': []}
-                temp = {'timestamp': time.time()}
+                data = {'kind': kind, 'name': name}
                 if data['kind'] == 'journal': 
                     content = ' '.join(content.split(' ')[4:]) 
-                temp['content'] = content
-                client.send_packet(PacketMachineLog(data))
-                
+                data['log'] = content
+                self.client.send_packet(PacketMachineLog(**data))                
 
 
 

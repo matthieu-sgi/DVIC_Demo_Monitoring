@@ -3,6 +3,7 @@
 import json
 from multiprocessing import Queue
 import os
+from queue import Empty
 import subprocess
 import traceback
 import atexit
@@ -47,7 +48,7 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
         try:
             print("Starting send thread") #FIXME remove
             while True:
-                pck: Packet = self.send_queue.get()
+                pck: Packet = self.send_queue.get(True)
                 self.ws.send(pck.encode())
         except:
             traceback.print_exc()

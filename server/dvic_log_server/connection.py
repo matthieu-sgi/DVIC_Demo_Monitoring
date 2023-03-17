@@ -8,6 +8,8 @@ from dvic_log_server.database_drivers import ElasticConnector
 from time import time
 from starlette.websockets import WebSocketState
 
+from dvic_log_server.logs import info, warning, error, debug
+
 elk_host = 'localhost'
 elk_port = 9200
 
@@ -41,9 +43,19 @@ class Connection:
         try: return self.send_queue.get(block=False)
         except: return None
 
+    def _procotol_error(self, msg: str):
+        error(f'Protocol error: {msg}')
+        self.close()
+
     def receive_packet(self, pck: Packet):
+        if pck is None: self._procotol_error("Packet cannot be decoded")
         self.last_seen = time()
-        getattr(self, f'_handle_{pck.identifier}')(pck)
+        fct = getattr(self, f'_handle_{pck.identifier}')
+        if fct is None: self._protocol_error(f'no such packet {pck.identifier}')
+        try: fct(pck)
+        except:
+            error(f"Failed to handle packet {pck.identifier}")
+            traceback.print_exc()
     
     def close(self):
         self.in_use = False
@@ -58,8 +70,10 @@ class Connection:
         elk.close()
     
     def _handle_machine_log(self, pck: PacketMachineLog):
+        print('handling machine log')
+        import time
         elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
-        elk.insert(pck.get_data())
+        elk.insert({'node': self.uid, 'kind': pck.kind, 'name': pck.name, 'value': pck.log, 'timestamp': time.time()})
         elk.close()
 
     def _handle_node_status(self, pck: PacketNodeStatus):

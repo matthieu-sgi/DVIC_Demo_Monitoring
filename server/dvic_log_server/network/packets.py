@@ -61,7 +61,7 @@ class Packet:
         """
         raise NotImplementedError()
 
-    def set_data(self, data: dict) -> None:
+    def set_data(self, data: dict) -> "Packet":
         """set the data values of the class form a dict representation
 
         Parameters
@@ -140,15 +140,19 @@ class PacketDemoProcState(Packet):
         self.data = data
     
 class PacketMachineLog(Packet):
-    def __init__(self, data : dict = None) -> None:
+    def __init__(self, kind: str = None, name: str = None, log: str = None) -> None:
         super().__init__("machine_log")
-        self.data = data
+        self.kind = kind
+        self.name = name
+        self.log  = log
 
     def get_data(self) -> dict:
-        return self.data
+        return {'kind': self.kind, 'name': self._encode_str(self.name), 'log': self._encode_str(self.log)}
     
     def set_data(self, data: dict) -> None:
-        self.data = data
+        self.kind = data['kind']
+        self.name = self._decode_str(data['name'])
+        self.log  = self._decode_str(data['log'])
 
 class PacketShellCommandResponse(Packet):
     def __init__(self, data : dict) -> None:
@@ -207,7 +211,8 @@ def decode(source: str) -> Packet:
     try:
         data = json.loads(source)
         pck: Packet = getattr(sys.modules[__name__], f'Packet{PACKET_ID_MATCHING[data["type"]]}')()
-        return pck.set_data(data = data['data'])
+        pck.set_data(data = data['data'])
+        return pck
     except:
         traceback.print_exc()
         print(f"Packet was: ", source)
