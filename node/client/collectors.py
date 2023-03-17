@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from multiprocessing import Queue
 from queue import Empty
-from network.packets import Packet, PacketHardwareState, PacketMachineLog
+from client.network.packets import Packet, PacketHardwareState, PacketMachineLog
 
 
 import datetime
