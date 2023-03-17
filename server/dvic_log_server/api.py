@@ -20,6 +20,9 @@ class ConnectionManager(CryptPhonebook):
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         #remove the 'dvic_log_server' part of the path
         self.log_path = self.log_path[:self.log_path.rfind('/')]
+        if not self.is_secure_auth_enabled():
+            self.private_key_path = None
+            print(f'[WARNING] The API is configured to IGNORE cryptographic client authentication. DO NOT do this in a production setting.')
     
     def __setitem__(self, uid: str, connection: Connection) -> None:
         if connection is None:
@@ -47,6 +50,12 @@ class ConnectionManager(CryptPhonebook):
         if uid not in self.connections: return None
         return self.connections[uid]
     
+    def get_client_salt(self, uid: str) -> str:
+        return super().get_client_salt(uid) #TODO
+    
+    def set_client_salt(self, uid: str, salt: str) -> None:
+        return super().set_client_salt(uid, salt) #TODO
+
     # def handle_client_message(self, message : json):
     #     if message['type'] in MESSAGE_TYPES_SERVER:
     #         if MESSAGE_TYPES_SERVER[message['type']] is not None:
@@ -68,14 +77,17 @@ def installer_download(install_token: str):
 @app.get('/preauth/{uid}')
 def get_salt(uid):
     cm = ConnectionManager()
+    if not cm.is_secure_auth_enabled():
+        print(f'[AUTH] Ignore pre auth')
+        return {'message': 'Pre-auth is disabled'}
     salt = CryptClient.get_salt()
     cm.set_client_salt(uid, salt)
     print(f'[AUTH] Preauth for {uid}: {salt}')
+    return {"preauth_key": salt}
 
     
-@app.websocket("/ws/{token}") #TODO identifier in initial request?
+@app.websocket("/ws/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str):
-    # uid = str(uuid.uuid4()) # uid  generated here, to auth a connection. #TODO use preset uuid to handle connection reset
     cry = CryptClient()
     uid, packet_ok = cry.verify_initial_packet(token, ConnectionManager())
 

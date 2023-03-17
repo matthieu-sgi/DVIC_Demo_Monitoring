@@ -8,11 +8,6 @@ from abc import ABC, abstractmethod
 
 from ecdsa import SigningKey, VerifyingKey
 import ecdsa
-# private_key = SigningKey.generate() # uses NIST192p
-# signature = private_key.sign(b"Educative authorizes this shot")
-# print(signature)
-# public_key = private_key.verifying_key
-# print("Verified:", public_key.verify(signature, b"Educative authorizes this shot"))
 
 UUID_LEN = 36
 SALT_LEN = 16
@@ -28,6 +23,9 @@ class CryptPhonebook(ABC):
      @abstractmethod
      def set_client_salt(self, uid: str, salt: str) -> None: ...
 
+     def is_secure_auth_enabled(self) -> bool: 
+        return not bool(os.environ.get('DISABLE_CRYPTO'))
+
 class CryptClient():
     def __init__(self, public_key: Union[Path, bytes] = None, private_key: Union[Path, str] = None) -> None:
         self.private_key = None; self.public_key = None
@@ -37,9 +35,15 @@ class CryptClient():
         if private_key is not None:
             self.private_key: SigningKey = SigningKey.from_pem(self._read_key(private_key))
     
-        if self.public_key is None and self.private_key is None:
-            raise Exception("No public or private key provided")
+        if self.disabled:
+            print(f'[CRYPTO] No public or private key, the crypto module is therefore disabled')
 
+    @property
+    def disabled(self):
+        return self.public_key is None and self.private_key is None
+
+    def _raise_if_disabled(self):
+        if self.disabled: raise Exception("Crypto module disabled")
 
     def _read_key(self, k):
         if type(k) == str:
@@ -56,6 +60,7 @@ class CryptClient():
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k = SALT_LEN))
     
     def sign(self, msg: str) -> str:
+        self._raise_if_disabled()
         return base64.b64encode(self.private_key.sign(msg.encode())).decode()
 
     # def encrypt_for(self, to: crypto.PKey, msg: str) -> str:
@@ -65,11 +70,12 @@ class CryptClient():
     #     return self.private_key.to_cryptography_key().decrypt(base64.b64decode(msg), padding.PKCS1v15()).decode()
 
     def verify(self, key: VerifyingKey, plaintext: str, signature: str) -> bool:
+        self._raise_if_disabled()
         try: return key.verify(base64.b64decode(signature), plaintext.encode())
         except ecdsa.keys.BadSignatureError: return False
 
     def craft_initial_token(self, uid: str, salt: str):
-        # salt = CryptClient.get_salt()
+        self._raise_if_disabled()
         plaintext = f'{uid}{salt}'
         signature = client.encode_b64_for_url(self.sign(plaintext))
         return f'{plaintext}{signature}'
@@ -77,8 +83,10 @@ class CryptClient():
     def verify_initial_packet(self, pck: str, phone_book: CryptPhonebook) -> tuple[str, bool]:
         plaintext, signature = pck[:CUTOFF], pck[CUTOFF:]
         uid = plaintext[:UUID_LEN]
+        if not phone_book.is_secure_auth_enabled():
+            print(f'[AUTH] Bypass auth')
+            return uid, True
         key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))
-
         return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature))
     
     def encode_b64_for_url(self, b64: str):
