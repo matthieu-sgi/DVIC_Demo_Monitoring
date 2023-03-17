@@ -64,6 +64,14 @@ def installer_download(install_token: str):
     """
 
     pass
+
+@app.get('/preauth/{uid}')
+def get_salt(uid):
+    cm = ConnectionManager()
+    salt = CryptClient.get_salt()
+    cm.set_client_salt(uid, salt)
+    print(f'[AUTH] Preauth for {uid}: {salt}')
+
     
 @app.websocket("/ws/{token}") #TODO identifier in initial request?
 async def websocket_endpoint(websocket: WebSocket, token: str):

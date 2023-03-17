@@ -25,6 +25,9 @@ class CryptPhonebook(ABC):
      @abstractmethod
      def get_client_salt(self, uid: str) -> str: ...
 
+     @abstractmethod
+     def set_client_salt(self, uid: str, salt: str) -> None: ...
+
 class CryptClient():
     def __init__(self, public_key: Union[Path, bytes] = None, private_key: Union[Path, str] = None) -> None:
         self.private_key = None; self.public_key = None
@@ -48,7 +51,8 @@ class CryptClient():
                 with open(k, 'r') as fh: return fh.read()
         raise Exception("Cannot load private key")
 
-    def get_salt(self) -> str:
+    @staticmethod
+    def get_salt() -> str:
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k = SALT_LEN))
     
     def sign(self, msg: str) -> str:
@@ -64,8 +68,8 @@ class CryptClient():
         try: return key.verify(base64.b64decode(signature), plaintext.encode())
         except ecdsa.keys.BadSignatureError: return False
 
-    def craft_initial_token(self, uid: str):
-        salt = self.get_salt()
+    def craft_initial_token(self, uid: str, salt: str):
+        # salt = CryptClient.get_salt()
         plaintext = f'{uid}{salt}'
         signature = client.encode_b64_for_url(self.sign(plaintext))
         return f'{plaintext}{signature}'
@@ -89,7 +93,7 @@ if __name__ == '__main__':
     #! fixme: cannot crete salt on client side because of replay attacks
     client = CryptClient(private_key='./testing/client1.private')
     u = 'e118857e-3732-4e58-aa9c-56685c6a6492' # str(uuid.uuid4())
-    pck = client.craft_initial_token(u)
+    pck = client.craft_initial_token(u, CryptClient.get_salt())
     print(pck)
     server = CryptClient(private_key='./testing/api.private')
 
