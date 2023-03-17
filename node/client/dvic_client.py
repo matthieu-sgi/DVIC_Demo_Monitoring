@@ -14,20 +14,35 @@ from websocket import create_connection, WebSocket
 import logging
 from client.interactive_session import InteractiveSession
 from client.meta import AbstractDVICNode
+from client.utils.crypto import CryptPhonebook
 
 DEFAULT_UID = "1d1f0545-2b60-488e-9419-d54b23bda47d" #fixed for testing TODO: read from config.
 DEFAULT_ENDPOINT = 'wss://dvic.devinci.fr/demo_control/ws/'
 
-class DVICClient(AbstractDVICNode):
+class DVICClient(AbstractDVICNode, CryptPhonebook):
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
     def __init__(self):        
         super().__init__()
         self.send_queue = Queue()
         self.interactive_sessions: dict[str, InteractiveSession] = {}
-        print(f'[STARTUP] Connection to {self.url}')
-        self.ws: WebSocket = create_connection(self.url)
-        print(f'[STARTUP] Connected')
-        
+
+    def get_public_key(self, uid: str) -> str:
+        return super().get_public_key(uid) #TODO
+
+    def get_client_salt(self, uid: str) -> str:
+        return super().get_client_salt(uid) #TODO
+    
+    def set_client_salt(self, uid: str, salt: str) -> None:
+        return super().set_client_salt(uid, salt) #TODO
+
+
+    def _craft_auth_token(self): 
+        if not self.is_secure_auth_enabled():
+            print(f'[AUTH] Bypassing auth')
+            return self.uid
+        raise NotImplementedError()
+        #TODO 
+
     def _send_thread_target(self):
         try:
             print("Starting send thread") #FIXME remove
@@ -40,11 +55,14 @@ class DVICClient(AbstractDVICNode):
             except: pass
 
     @property
+    def uid(self) -> str:
+        return os.environ.get('DVIC_MACHINE_UID') or DEFAULT_UID
+
+    @property
     def url(self) -> str:
         base = os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
         if not base.endswith('/'): base = f'{base}/'
-        uid  = os.environ.get('DVIC_MACHINE_UID') or DEFAULT_UID
-        return f'{base}{uid}'
+        return f'{base}'
 
     def send_packet(self, pck: Packet):
         self.send_queue.put(pck)
@@ -57,6 +75,12 @@ class DVICClient(AbstractDVICNode):
         self.ws.close()
 
     def run(self) -> NoReturn:
+        auth_token = self._craft_auth_token()
+        url = self.url + auth_token
+        print(f'[STARTUP] Connection to {url}')
+        self.ws: WebSocket = create_connection(url)
+        print(f'[STARTUP] Connected')
+        
         atexit.register(self.exit_handler)
         Thread(target=self._send_thread_target,  daemon=True).start()
         Thread(target=self._recpt_thread_target, daemon=True).start()
@@ -105,7 +129,6 @@ class DVICClient(AbstractDVICNode):
     #TODO @Matthieu implement the rest of the handlers
    
 
-    
     def execute_shell_command(self, command: str) -> None:
         '''Execute a shell command on the DVIC node.'''
         print(f'Executing shell command: {command}') 
