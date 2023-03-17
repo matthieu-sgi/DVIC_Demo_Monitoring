@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from multiprocessing import Queue
 from queue import Empty
 from client.network.packets import Packet, PacketHardwareState, PacketMachineLog
+from client.dvic_client import DVICClient, AbstractDVICNode
 
 
 import datetime
@@ -16,19 +17,20 @@ import os
 import logging
 
 
+client = DVICClient()
+
 class DataAggregator(ABC): 
     '''Class used to handle the data aggregation'''
 
-    def __init__(self):
+    def __init__(self, client : AbstractDVICNode):
         self.running = False
         self.process : subprocess.Popen = None
         self.thread : threading.Thread = None
-        self.queue = Queue()
-        self.packet : Packet = None
+        self.client : AbstractDVICNode = client
 
     @abstractmethod
     def _thread_target(self):
-        '''Target for the thread'''
+        '''Target for the thread used to get the data, transform it into a packet and send it to the server'''
         raise NotImplementedError()
     
 
@@ -48,11 +50,7 @@ class DataAggregator(ABC):
                 self.process.kill()
                         
             self.thread.join(timeout=1)
-    
-    @abstractmethod
-    def create_packet(self):
-        '''Create a packet with the data'''
-        raise NotImplementedError()
+
 
         
 
@@ -63,58 +61,35 @@ class LogReader(DataAggregator):
         file_path : str = None
         journal_unit : str = None
     '''
-    def __init__(self, *, file_path : str = None, journal_unit : str = None) -> None:
-        super().__init__('machine_log')
+    def __init__(self, client : AbstractDVICNode, *, file_path : str = None, journal_unit : str = None) -> None:
+        super().__init__(client)
         self.file_path = file_path
         self.journal_unit = journal_unit
         self.process = self._define_process()
-        self.packet = PacketMachineLog()
     
     def _define_process(self) -> subprocess.Popen:
         '''Define the process to use'''
+
         if self.file_path is not None:
-            self.process = subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #TODO @Matthieu just in case tail is actually not installed, use a pure python logic
+            return subprocess.Popen(['tail', '-f', self.file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #TODO @Matthieu just in case tail is actually not installed, use a pure python logic
         elif self.journal_unit is not None:
-            self.process = subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #NOTE journaltcl is installed on all systemd managed machines
+            return subprocess.Popen(['journalctl', '-f', '-u', self.journal_unit], stdout=subprocess.PIPE, stderr=subprocess.PIPE) #NOTE journaltcl is installed on all systemd managed machines
         else:
             raise Exception('No file path or journal unit specified')
 
     
     def _thread_target(self)-> None:
-        '''Read the log file'''
-        while self.running:
-            line = self.process.stdout.readline()
-            if line:
-                self.queue.put(line.decode('utf-8').strip())
-
-    # def get_type(self) -> str: # ? @gregor this is nomore needed because of _get_reader_type_with_target right ?
-    #     '''Get the type of log reader'''
-    #     if self.file_path is not None:
-    #         return 'file'
-    #     elif self.journal_unit is not None:
-    #         return 'journal'
-    #     else:
-    #         return 'unknown' #FIXME by what you have in _define_process this case should not happen
-    
-
-    def _get_reader_type_with_target(self) -> tuple[str]:
-        if self.file_path is not None:
-            return 'file', self.file_path
-        elif self.journal_unit is not None:
-            return 'journal', self.journal_unit
-        else:
-            raise RuntimeError()
-
-    def get_logs(self) -> dict:
-        """Get the logs from the queue
-        Return a dict with the logs
+        """Read from the log file.
+        Get a dict with the data collected from the log file
+        Create a packet and send it to the server
 
         Returns
         -------
-        dict
-            The data collected form the log
+        None
 
-        The data output looks like
+        Data sent
+        ---------
+        The data sent to the server looks like
         ```
         {
             'kind': 'file or systemd' 
@@ -132,52 +107,43 @@ class LogReader(DataAggregator):
         `logs` can contain multiple lines
 
         """
-        if self.queue.empty(): return {}
-
-        kind, name = self._get_reader_type_with_target()
-        data = {'kind': kind, 'name': name, 'logs': []}
-        
-        #! NOTE @Matthieu be advised that queue.empty() is NOT thread safe and unreliable https://docs.python.org/3/library/queue.html#queue.Queue.empty
-        
-        try:
-            while content := self.queue.get_nowait():
+        while self.running:
+            content = self.process.stdout.readline()
+            if content:
+                kind, name = self._get_reader_type_with_target()
+                data = {'kind': kind, 'name': name, 'logs': []}
                 temp = {'timestamp': time.time()}
-                if self.get_type() == 'journal': 
+                if data['kind'] == 'journal': 
                     content = ' '.join(content.split(' ')[4:]) 
                 temp['content'] = content
-                data['logs'].append(temp)
-        except Empty: pass
+                client.send_packet(PacketMachineLog(data))
+                
 
-        return data
-    
-    def __len__(self) -> int:
-        '''Get the size of the queue'''
-        return self.queue.qsize()
 
-    def create_packet(self, data) -> PacketMachineLog:
-        '''Create a packet with the data'''
-        self.packet.data = data
-        return self.packet
-    
+
+    def _get_reader_type_with_target(self) -> tuple[str]:
+        if self.file_path is not None:
+            return 'file', self.file_path
+        elif self.journal_unit is not None:
+            return 'journal', self.journal_unit
+        else:
+            raise RuntimeError()
+
+
 
 HARDWARE_INFO_ENUM = ['machine_name', 'ip', 'temperature', 'cpu_usage', 'memory_usage']
 
 
 class HardwareInfo(DataAggregator):
-    def __init__(self):
-        super().__init__()
-        self.packet = PacketHardwareState()
+    def __init__(self, client : AbstractDVICNode) -> None:
+        super().__init__(client)
     
-    def _thread_target(self):
+    def _thread_target(self) -> None:
+        # TODO: transform this into a coroutine empackting the data and sending it to server
         while self.running :
-            data = {}
-            data['machine_name'] = self._get_machine_name()
-            data['ip'] = self._get_ip()
-            data['temperature'] = self._get_temperature()
-            data['cpu_usage'] = self._get_cpu_usage()
-            data['memory_usage'] = self._get_memory_usage()
-            self.queue.put(data)
-            time.sleep(10)
+            packet = Packet(self.get_hardware_info())
+            client.send_packet(packet)
+            time.sleep(0.5)
     
     def _get_machine_name(self) -> str:
         '''Get the machine name'''
@@ -237,26 +203,21 @@ class HardwareInfo(DataAggregator):
         }
         return memory_info
     
-    def get_hardware_info(self,*, info : str = None) -> dict:
+    def get_hardware_info(self,*, info : str | list[str] = None) -> dict:
         '''Get the logs from the queue. This empty the queue'''
-        data = {}
-        if self.queue.empty(): return data
-        if info is not None :
-            if info not in HARDWARE_INFO_ENUM:
-                raise ValueError(f'Invalid info {info}')
-            data = {'kind' : 'hardware_info', 'name' : info, 'logs' : []}
-            data['logs'] = self.queue.get_nowait()[info]
-            return data
-        else: #FIXME : Try to find a way to implement this the same way as the get_logs() method. {'kind' : 'hardware_info', 'name' : info, 'logs' : []]}
-            temp = self.queue.get_nowait()
-            oui = []
-            for key in temp.keys():
-                oui.append({'kind' : 'hardware_info', 'name' : key, 'logs' : temp[key]})
-            return oui[:]
-    
-    def create_packet(self, data) -> PacketHardwareState:
-        self.packet.set_data(data)
-        return self.packet
+        # TODO : transform this into a generator that fecth the logs and yield them
+
+        # Verify if info is included in the enum
+        if info is not None and info not in HARDWARE_INFO_ENUM:
+            raise ValueError(f'Invalid info type, must be in {HARDWARE_INFO_ENUM}')
+        if info is None:
+            info = HARDWARE_INFO_ENUM
+        elif isinstance(info, str):
+            info = [info]
+        for i in info:
+            data = {'kind' : info, 'log' : {}}
+            data['log'] = getattr(self, f'_get_{i}')()
+            yield data
 
         
         
@@ -277,7 +238,7 @@ class DataAggregatorManager(): # ? What do you think about the changes of this c
         self.data_aggregators : list[DataAggregator] = []
     
     def add_data_aggregator(self, data_aggregators : DataAggregator) -> None:
-        self.log_readers.append(data_aggregators)
+        self.data_aggregators.append(data_aggregators)
     
     def launch_data_aggregator(self, data_aggregator : DataAggregator) -> None:
         data_aggregator.launch()
@@ -295,6 +256,7 @@ class DataAggregatorManager(): # ? What do you think about the changes of this c
 
     def __set__(self, index : int, data_aggregator : DataAggregator) -> None:
         self.data_aggregators[index] = data_aggregator
+    
     
     
 if __name__ == '__main__': # Only for testing

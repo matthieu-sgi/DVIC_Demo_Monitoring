@@ -106,7 +106,7 @@ class PacketNodeStatus(Packet):
         return self
 
 class PacketHardwareState(Packet):
-    def __init__(self, data : dict) -> None:
+    def __init__(self, data : dict = None) -> None:
         super().__init__("hardware_state")
         self.data = data
 
@@ -140,7 +140,7 @@ class PacketDemoProcState(Packet):
         self.data = data
     
 class PacketMachineLog(Packet):
-    def __init__(self, data : dict) -> None:
+    def __init__(self, data : dict = None) -> None:
         super().__init__("machine_log")
         self.data = data
 
