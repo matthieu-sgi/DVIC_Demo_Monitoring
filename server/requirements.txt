@@ -1,6 +1,5 @@
 fastapi
 websockets
 uvicorn
-json
 elasticsearch
 ecdsa
