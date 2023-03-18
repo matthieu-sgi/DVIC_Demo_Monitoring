@@ -9,3 +9,5 @@ server/.logs/
 */.coverage.*
 */.coverage.*
 */.cov
+
+node/tests/exports.sh

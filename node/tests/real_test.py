@@ -7,7 +7,8 @@ from client.collectors import HardwareInfo, DataAggregatorManager, LogReader
 if __name__ == '__main__':
     client = DVICClient()
     manager = DataAggregatorManager()
-    log_r = LogReader(client = client, file_path='tests/resources/log_example.log')
+    # log_r = LogReader(client = client, file_path='/home/wanikatako/audrey.txt')
+    log_r = HardwareInfo(client=client)
     manager.add_data_aggregator(log_r)
     manager.launch_all()
     client.run()
