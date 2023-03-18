@@ -85,7 +85,8 @@ class ElasticConnector:
 
     
 if __name__ == '__main__':
-    db = ElasticConnector('localhost', 9200, 'test_index')
+    db = ElasticConnector('localhost', 9200, 'machine_logs')
     print(db.test_connection())
     print(db.get_all())
+    
 

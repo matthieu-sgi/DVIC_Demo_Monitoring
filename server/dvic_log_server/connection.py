@@ -73,7 +73,7 @@ class Connection:
         print('handling machine log')
         import time
         elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
-        elk.insert({'node': self.uid, 'kind': pck.kind, 'name': pck.name, 'value': pck.log, 'timestamp': time.time()})
+        elk.insert({'node': self.uid, 'kind': pck.kind, 'name': pck.name, 'value': pck.log.strip(), 'timestamp': time.time()})
         elk.close()
 
     def _handle_node_status(self, pck: PacketNodeStatus):
