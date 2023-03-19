@@ -106,15 +106,17 @@ class PacketNodeStatus(Packet):
         return self
 
 class PacketHardwareState(Packet):
-    def __init__(self, data : dict = None) -> None:
+    def __init__(self, kind : str = None, log : str = None) -> None:
         super().__init__("hardware_state")
-        self.data = data
+        self.kind = kind
+        self.log  = log
 
     def get_data(self) -> dict:
-        return self.data
+        return {'kind': self.kind, 'log': self._encode_str(self.log)}
     
     def set_data(self, data: dict) -> None:
-        self.data = data
+        self.kind = data['kind']
+        self.log  = self._decode_str(data['log'])
 
 class PacketLogEntry(Packet):
     def __init__(self, data : dict) -> None:

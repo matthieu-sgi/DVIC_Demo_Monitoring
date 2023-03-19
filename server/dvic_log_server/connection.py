@@ -63,7 +63,7 @@ class Connection:
 
     # handlers
 
-    def _handle_machine_hardware_state(self, pck: PacketHardwareState):
+    def _handle_hardware_state(self, pck: PacketHardwareState):
         '''Handle a hardware state packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_hardware_state')
         elk.insert(pck.get_data())

@@ -1,8 +1,6 @@
 '''Collectors for the DVIC node.'''
 
 from abc import ABC, abstractmethod
-from multiprocessing import Queue
-from queue import Empty
 from client.network.packets import Packet, PacketHardwareState, PacketMachineLog
 from client.dvic_client import DVICClient, AbstractDVICNode
 
@@ -133,8 +131,8 @@ class HardwareInfo(DataAggregator):
     def _thread_target(self) -> None:
         # TODO: transform this into a coroutine empackting the data and sending it to server
         while self.running :
-            packet = Packet(self.get_hardware_info())
-            client.send_packet(packet)
+            packet = PacketHardwareState(**next(self.get_hardware_info()))
+            self.client.send_packet(packet)
             time.sleep(0.5)
     
     def _get_machine_name(self) -> str:
@@ -207,7 +205,7 @@ class HardwareInfo(DataAggregator):
         elif isinstance(info, str):
             info = [info]
         for i in info:
-            data = {'kind' : info, 'log' : {}}
+            data = {'kind' : i, 'log' : {}}
             data['log'] = getattr(self, f'_get_{i}')()
             yield data
 
@@ -253,25 +251,9 @@ class DataAggregatorManager(): # ? What do you think about the changes of this c
     
 if __name__ == '__main__': # Only for testing
 
-    format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, level=logging.INFO,
-                        datefmt="%H:%M:%S")
-    logging.info("Main    : before creating thread")
-
-    hard = HardwareInfo()
-    hard.launch()
-
-    try :
-        while True:
-            logging.info('Main    : before getting logs')
-            logs = hard.get_hardware_info()
-            if logs:
-                logging.info(f'Logs : {logs}')
-            time.sleep(1)
-            continue
-    except KeyboardInterrupt:
-        hard.stop()
-        logging.info('Main    : all done')
+    hard = HardwareInfo(None)
+    
+    print(next(hard.get_hardware_info()))
 
 
 
