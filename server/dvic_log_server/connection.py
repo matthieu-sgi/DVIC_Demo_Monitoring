@@ -70,7 +70,6 @@ class Connection:
         elk.close()
     
     def _handle_machine_log(self, pck: PacketMachineLog):
-        print('handling machine log')
         import time
         elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
         elk.insert({'node': self.uid, 'kind': pck.kind, 'name': pck.name, 'value': pck.log.strip(), 'timestamp': time.time()})

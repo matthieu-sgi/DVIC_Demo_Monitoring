@@ -27,7 +27,7 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
     def url(self) -> str:
         base = os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
         if not base.endswith('/'): base = f'{base}/'
-        return f'{base}{self.uid}'
+        return f'{base}{self.uid}' #FIXME use crypto
 
     def __enter__(self):
         return self
