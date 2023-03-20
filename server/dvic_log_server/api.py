@@ -137,5 +137,5 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
         error(f'[{uid}] Err: disconnected')
     conn.in_use = False #FIXME put in a method
     send.cancel()
-    warning(f"[{uid}] Disconnected")
     ConnectionManager()[uid] = None
+    warning(f"[{uid}] Connection Closed")
