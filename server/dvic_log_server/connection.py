@@ -62,8 +62,8 @@ class Connection:
         asyncio.run_coroutine_threadsafe(self.ws.close(), asyncio.get_event_loop())
 
     # handlers
-
-    def _handle_machine_log(self, pck : PacketMachineLog):
+    #################! REMOVE THIS ##################
+    def _handle_machine_log(self, pck : PacketMachineLog): # TODO : Im changing this to log_entry
         '''Handle a machine log packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
         dict_to_store = {'node': self.uid, 
@@ -72,10 +72,10 @@ class Connection:
                          'name' : pck.name, 
                          'log' : pck.log, 
                          'timestamp': time()}
-        info(f'Log to store : {dict_to_store}') #! remove this
-
         elk.insert(dict_to_store)
         elk.close()
+    
+    #################! REMOVE THIS ##################
 
     def _handle_hardware_state(self, pck: PacketHardwareState):
         '''Handle a hardware state packet'''
@@ -104,7 +104,14 @@ class Connection:
     
     def _handle_log_entry(self, pck: PacketLogEntry):
         '''Handle a log entry packet'''
-        raise NotImplementedError()
+        elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
+        dict_to_store = {'node': self.uid, 
+                         'type': pck.identifier, 
+                         'kind': pck.kind, 
+                         'name' : pck.name, 
+                         'log' : pck.log, 
+                         'timestamp': time()}
+        elk.insert(dict_to_store)
     
     def _handle_demo_proc_state(self, pck: PacketDemoProcState):
         '''Handle a demo process state packet'''

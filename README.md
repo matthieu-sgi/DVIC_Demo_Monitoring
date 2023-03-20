@@ -85,16 +85,16 @@ Information types:
 
 - [x] Receive data from nodes
 - [ ] Keep state history of metrics
-- [ ] Choose database for log
+- [x] Choose database for log
 - [x] Choose log format
-- [ ] Keep log history in database 
+- [x] Keep log history in database 
 - [x] Expose API for dashboard (node state, last logs etc)
 - [ ] Terminal session from dashboard
 
 ### Libraries
 
 - [ ] Library writes to /tmp
-- [ ] Implement log format with log level
+- [x] Implement log format with log level
 - [ ] Write PID or other info on the first line (pid, exec, user etc)
 - [ ] Deploy artifacts
 

@@ -1,7 +1,7 @@
 '''Collectors for the DVIC node.'''
 
 from abc import ABC, abstractmethod
-from client.network.packets import Packet, PacketHardwareState, PacketMachineLog
+from client.network.packets import Packet, PacketHardwareState, PacketMachineLog, PacketLogEntry
 from client.dvic_client import DVICClient, AbstractDVICNode
 
 
@@ -107,7 +107,7 @@ class LogReader(DataAggregator):
                 if data['kind'] == 'journal': 
                     content = ' '.join(content.split(' ')[4:]) 
                 data['log'] = content
-                self.client.send_packet(PacketMachineLog(**data))              
+                self.client.send_packet(PacketLogEntry(**data))              
 
 
 
@@ -208,9 +208,9 @@ class HardwareInfo(DataAggregator):
         elif isinstance(info, str):
             info = [info]
         for i in info:
-            data = {'kind' : i, 'log' : {}}
-            data['log'] = getattr(self, f'_get_{i}')()
-            yield data # FIXME : only returns machine_name
+            data = {'kind' : i, 'data' : {}}
+            data['data'] = getattr(self, f'_get_{i}')()
+            yield data
 
         
         
