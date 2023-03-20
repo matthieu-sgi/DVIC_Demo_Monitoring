@@ -35,16 +35,29 @@ class Packet:
     def _encode_str(self, s: Union[str, bytes]) -> str:
         if type(s) is not bytes: s = s.encode('utf-8')
         return base64.b64encode(s).decode()
+
+    
+    def _encode_dict(self, d: dict) -> dict:
+        encoded_dict = json.dumps(d).encode('utf-8')
+        return self._encode_str(encoded_dict)
     
     def _decode_str(self, s: str, to_str: bool = True) -> Union[bytes, str]:
         b: bytes = base64.b64decode(s)
         return b.decode('utf-8') if to_str else b
+    
+    def _decode_dict(self, d: dict) -> dict:
+        encoded_dict = self._decode_str(d, to_str=False)
+        return json.loads(encoded_dict)
 
     def encode(self) -> str:
         return json.dumps({
             'type': self.identifier,
             'data': self.get_data()
         })
+    
+    def to_dict(self) -> dict :
+        '''convert the packet to a dict to store in the database''' 
+        raise NotImplementedError()
 
     def get_data(self) -> dict:
         """get data from this packet
@@ -74,7 +87,8 @@ class Packet:
         NotImplementedError
             This method must be implemented in the classes expanding from Packet
         """
-        raise NotImplementedError()    
+        raise NotImplementedError()
+
 
 class PacketFileTransfer(Packet):
     def __init__(self, path: str = None, content: bytes = None, mode: str = None, owner: str = None) -> None:
@@ -110,13 +124,24 @@ class PacketHardwareState(Packet):
         super().__init__("hardware_state")
         self.kind = kind
         self.log  = log
+        self.DICT_KINDS = ['temperature', 'memory' ]
 
     def get_data(self) -> dict:
-        return {'kind': self.kind, 'log': self._encode_str(self.log)}
+        log = self.log
+        if type(log) is dict: log = self._encode_dict(log)
+        else: log = self._encode_str(str(log))
+        return {'kind': self.kind, 'log': log}
     
     def set_data(self, data: dict) -> None:
         self.kind = data['kind']
-        self.log  = self._decode_str(data['log'])
+        log = data['log']
+        if self.kind in self.DICT_KINDS: self.log = self._decode_dict(log)
+        else: self.log = self._decode_str(log)
+    
+    def to_dict(self) -> dict :
+        '''convert the packet to a dict'''
+        return {'type' : self.identifier,'kind': self.kind, 'log': self.log}
+
 
 class PacketLogEntry(Packet):
     def __init__(self, data : dict) -> None:
@@ -219,3 +244,10 @@ def decode(source: str) -> Packet:
         traceback.print_exc()
         print(f"Packet was: ", source)
         raise
+
+if __name__ == "__main__":
+    pck = PacketHardwareState('temperature', {'a': 1, 'b': 2})
+    data = pck.encode()
+    print(data)
+    pck2 = decode(data)
+    print(pck2.to_dict())
