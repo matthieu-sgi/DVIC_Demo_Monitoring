@@ -10,4 +10,3 @@ server/.logs/
 */.coverage.*
 */.cov
 
-node/tests/exports.sh

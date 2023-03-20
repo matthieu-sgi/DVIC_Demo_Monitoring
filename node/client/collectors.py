@@ -129,11 +129,14 @@ class HardwareInfo(DataAggregator):
         super().__init__(client)
     
     def _thread_target(self) -> None:
-        # TODO: transform this into a coroutine empackting the data and sending it to server
         while self.running :
-            packet = PacketHardwareState(**next(self.get_hardware_info()))
-            self.client.send_packet(packet)
+            gen = self.get_hardware_info()
+            for data in gen:
+                print(data)
+                packet = PacketHardwareState(**data)
+                self.client.send_packet(packet)
             time.sleep(0.5)
+
     
     def _get_machine_name(self) -> str:
         '''Get the machine name'''
@@ -207,7 +210,7 @@ class HardwareInfo(DataAggregator):
         for i in info:
             data = {'kind' : i, 'log' : {}}
             data['log'] = getattr(self, f'_get_{i}')()
-            yield data
+            yield data # FIXME : only returns machine_name
 
         
         

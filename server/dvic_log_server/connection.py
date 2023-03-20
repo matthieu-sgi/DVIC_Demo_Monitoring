@@ -66,14 +66,8 @@ class Connection:
     def _handle_hardware_state(self, pck: PacketHardwareState):
         '''Handle a hardware state packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_hardware_state')
-        elk.insert(pck.get_data())
-        elk.close()
-    
-    def _handle_machine_log(self, pck: PacketMachineLog):
-        print('handling machine log')
-        import time
-        elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
-        elk.insert({'node': self.uid, 'kind': pck.kind, 'name': pck.name, 'value': pck.log.strip(), 'timestamp': time.time()})
+        info(f"PRINTTING THE RECEIVED PACKET {pck.to_dict()}")
+        elk.insert({'node': self.uid, 'type': pck.identifier, 'kind': pck.kind, 'log': pck.log, 'timestamp': time()})
         elk.close()
 
     def _handle_node_status(self, pck: PacketNodeStatus):
