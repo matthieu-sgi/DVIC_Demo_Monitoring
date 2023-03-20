@@ -33,16 +33,17 @@ class Packet:
         self.identifier = identifier
         
     def _encode_str(self, s: Union[str, bytes]) -> str:
-        if type(s) is not bytes: s = s.encode('utf-8')
-        return base64.b64encode(s).decode()
+        if type(s) is not bytes: s = str(s).encode('utf-8')
+        return base64.b64encode(s).decode('utf-8')
 
     
     def _encode_dict(self, d: dict) -> dict:
         encoded_dict = json.dumps(d).encode('utf-8')
         return self._encode_str(encoded_dict)
     
-    def _decode_str(self, s: str, to_str: bool = True) -> Union[bytes, str]:
-        b: bytes = base64.b64decode(s)
+    def _decode_str(self, s: str, to_str: bool = True) -> Union[bytes, str]: # FIXME : @gregor Problem here with padding
+        # b: bytes = base64.b64decode(s)
+        b: bytes = base64.b64decode(s + '=' * (len(s) % 4))
         return b.decode('utf-8') if to_str else b
     
     def _decode_dict(self, d: dict) -> dict:
@@ -55,9 +56,9 @@ class Packet:
             'data': self.get_data()
         })
     
-    def to_dict(self) -> dict :
-        '''convert the packet to a dict to store in the database''' 
-        raise NotImplementedError()
+    # def to_dict(self) -> dict : # ? Easier to call properties
+    #     '''convert the packet to a dict to store in the database''' 
+    #     raise NotImplementedError()
 
     def get_data(self) -> dict:
         """get data from this packet
@@ -124,12 +125,12 @@ class PacketHardwareState(Packet):
         super().__init__("hardware_state")
         self.kind = kind
         self.log  = log
-        self.DICT_KINDS = ['temperature', 'memory' ]
+        self.DICT_KINDS = ['temperature', 'memory_usage' ]
 
     def get_data(self) -> dict:
         log = self.log
-        if type(log) is dict: log = self._encode_dict(log)
-        else: log = self._encode_str(str(log))
+        if self.kind in self.DICT_KINDS: log = self._encode_dict(log)
+        else: log = self._encode_str(log)
         return {'kind': self.kind, 'log': log}
     
     def set_data(self, data: dict) -> None:
@@ -138,10 +139,6 @@ class PacketHardwareState(Packet):
         if self.kind in self.DICT_KINDS: self.log = self._decode_dict(log)
         else: self.log = self._decode_str(log)
     
-    def to_dict(self) -> dict :
-        '''convert the packet to a dict'''
-        return {'type' : self.identifier,'kind': self.kind, 'log': self.log}
-
 
 class PacketLogEntry(Packet):
     def __init__(self, data : dict) -> None:
@@ -174,12 +171,14 @@ class PacketMachineLog(Packet):
         self.log  = log
 
     def get_data(self) -> dict:
-        return {'kind': self.kind, 'name': self._encode_str(self.name), 'log': self._encode_str(self.log)}
+        return {'kind': self._decode_str(self.kind),
+                'name': self._encode_str(self.name), 
+                'log': self._encode_str(self.log)}
     
     def set_data(self, data: dict) -> None:
-        self.kind = data['kind']
+        self.kind = self._decode_str(data['kind'])
         self.name = self._decode_str(data['name'])
-        self.log  = self._decode_str(data['log'])
+        self.log  = self._encode_str(data['log'])
 
 class PacketShellCommandResponse(Packet):
     def __init__(self, data : dict) -> None:

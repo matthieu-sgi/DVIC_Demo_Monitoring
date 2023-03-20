@@ -63,11 +63,17 @@ class Connection:
 
     # handlers
 
+    def _handle_machine_log(self, pck : PacketMachineLog):
+        '''Handle a machine log packet'''
+        raise NotImplementedError
+
     def _handle_hardware_state(self, pck: PacketHardwareState):
         '''Handle a hardware state packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_hardware_state')
-        info(f"PRINTTING THE RECEIVED PACKET {pck.to_dict()}")
-        elk.insert({'node': self.uid, 'type': pck.identifier, 'kind': pck.kind, 'log': pck.log, 'timestamp': time()})
+        # info(f'Log to store : {pck.log} and type {type(pck.log)}')
+        temp_dict = {'node': self.uid, 'type': pck.identifier, 'kind': pck.kind, 'log' : json.dumps(pck.log), 'timestamp': time()}
+        info(f'Log to store : {temp_dict} and type {type(temp_dict)}')
+        elk.insert(temp_dict)
         elk.close()
 
     def _handle_node_status(self, pck: PacketNodeStatus):

@@ -83,9 +83,16 @@ class ElasticConnector:
         '''Closes connection to database'''
         self.es.close()
 
-    
-if __name__ == '__main__':
+
+#################### TESTS ####################
+def remove_all():
     db = ElasticConnector('localhost', 9200, 'machine_hardware_state')
     db.delete_all()
+    db.close()
+
+if __name__ == '__main__':
+    print('This is a python module and should not be run directly')
+    db = ElasticConnector('localhost', 9200, 'test')
+    db.insert({'non' : 'doe', 'test': {'jesuis': 2.1, 'ekjzhi' : 'kjohizugeyf'}, 'test2': 'azeaze'})
     
 

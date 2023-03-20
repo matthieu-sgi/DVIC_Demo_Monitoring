@@ -107,7 +107,7 @@ class LogReader(DataAggregator):
                 if data['kind'] == 'journal': 
                     content = ' '.join(content.split(' ')[4:]) 
                 data['log'] = content
-                self.client.send_packet(PacketMachineLog(**data))                
+                self.client.send_packet(PacketMachineLog(**data))              
 
 
 
@@ -135,7 +135,7 @@ class HardwareInfo(DataAggregator):
                 print(data)
                 packet = PacketHardwareState(**data)
                 self.client.send_packet(packet)
-            time.sleep(0.5)
+            time.sleep(10)
 
     
     def _get_machine_name(self) -> str:
@@ -224,6 +224,7 @@ class HardwareInfo(DataAggregator):
     #             disk_usage[partition.mountpoint] = psutil.disk_usage(partition.mountpoint)
     #    return disk_usage
     
+
     
 
 class DataAggregatorManager(): # ? What do you think about the changes of this class ? Feel better
@@ -256,7 +257,8 @@ if __name__ == '__main__': # Only for testing
 
     hard = HardwareInfo(None)
     
-    print(next(hard.get_hardware_info()))
+    for i in hard.get_hardware_info():
+        print(i)
 
 
 

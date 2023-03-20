@@ -15,7 +15,7 @@ The roadmap for the central server is in the [general readme](../README.md)
 In order to run the api local and the elk stack, run :
 
 ```bash
-make run_local
+make launch_database && make run_local
 ```
 If you want to stop the elk stack, run :
 
