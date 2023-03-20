@@ -65,6 +65,7 @@ class Connection:
 
     def _handle_machine_log(self, pck : PacketMachineLog):
         '''Handle a machine log packet'''
+        print(pck.log)
         raise NotImplementedError
 
     def _handle_hardware_state(self, pck: PacketHardwareState):

@@ -141,27 +141,10 @@ class PacketHardwareState(Packet):
     
 
 class PacketLogEntry(Packet):
-    def __init__(self, data : dict) -> None:
-        super().__init__("log_entry")
-        self.data = data
-
-    def get_data(self) -> dict:
-        return self.data
-
-    def set_data(self, data: dict) -> None:
-        self.data = data
-
+    pass
 
 class PacketDemoProcState(Packet):
-    def __init__(self, data : dict) -> None:
-        super().__init__("demo_proc_state")
-        self.data = data
-
-    def get_data(self) -> dict:
-        return self.data
-    
-    def set_data(self, data: dict) -> None:
-        self.data = data
+    pass
     
 class PacketMachineLog(Packet):
     def __init__(self, kind: str = None, name: str = None, log: str = None) -> None:
@@ -171,25 +154,18 @@ class PacketMachineLog(Packet):
         self.log  = log
 
     def get_data(self) -> dict:
-        return {'kind': self._decode_str(self.kind),
+        return {'kind': self._encode_str(self.kind),
                 'name': self._encode_str(self.name), 
-                'log': self._encode_str(self.log)}
+                'log':  self._encode_str(self.log)
+        }
     
     def set_data(self, data: dict) -> None:
         self.kind = self._decode_str(data['kind'])
         self.name = self._decode_str(data['name'])
-        self.log  = self._encode_str(data['log'])
+        self.log  = self._decode_str(data['log'])
 
 class PacketShellCommandResponse(Packet):
-    def __init__(self, data : dict) -> None:
-        super().__init__("shell_command_response")
-        self.data = data
-
-    def get_data(self) -> dict:
-        return self.data
-    
-    def set_data(self, data: dict) -> None:
-        self.data = data
+    pass
 
 
 class PacketInteractiveSession(Packet):
