@@ -65,15 +65,23 @@ class Connection:
 
     def _handle_machine_log(self, pck : PacketMachineLog):
         '''Handle a machine log packet'''
-        print(pck.log)
-        raise NotImplementedError
+        elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
+        dict_to_store = {'node': self.uid, 
+                         'type': pck.identifier, 
+                         'kind': pck.kind, 
+                         'name' : pck.name, 
+                         'log' : pck.log, 
+                         'timestamp': time()}
+        info(f'Log to store : {dict_to_store}') #! remove this
+
+        elk.insert(dict_to_store)
+        elk.close()
 
     def _handle_hardware_state(self, pck: PacketHardwareState):
         '''Handle a hardware state packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_hardware_state')
         # info(f'Log to store : {pck.log} and type {type(pck.log)}')
-        temp_dict = {'node': self.uid, 'type': pck.identifier, 'kind': pck.kind, 'log' : json.dumps(pck.log), 'timestamp': time()}
-        info(f'Log to store : {temp_dict} and type {type(temp_dict)}')
+        temp_dict = {'node': self.uid, 'type': pck.identifier, 'kind': pck.kind, 'data' : json.dumps(pck.data), 'timestamp': time()}
         elk.insert(temp_dict)
         elk.close()
 
