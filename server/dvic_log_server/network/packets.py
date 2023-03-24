@@ -123,23 +123,23 @@ class PacketNodeStatus(Packet):
 
 class PacketHardwareState(Packet): #! I changed all the "log" to "data" ;)
     '''Hardware state contains info about the temperature, memory usage, etc. of the machine'''
+    DICT_KINDS = ['temperature', 'memory_usage' ] # FIXME : Dirty way to do this
     def __init__(self, kind : str = None, data : str = None) -> None:
         super().__init__("hardware_state")
         self.kind = kind
         self.data  = data
 
-        self.DICT_KINDS = ['temperature', 'memory_usage' ] # FIXME : Dirty way to do this
 
-    def get_data(self) -> dict:
+    def get_data(self,cls) -> dict:
         data = self.data
-        if self.kind in self.DICT_KINDS: data = self._encode_dict(data)
+        if self.kind in type(self).DICT_KINDS: data = self._encode_dict(data)
         else: data = self._encode_str(data)
         return {'kind': self.kind, 'data': data}
     
     def set_data(self, data: dict) -> None:
         self.kind = data['kind']
         data = data['data']
-        if self.kind in self.DICT_KINDS: self.log = self._decode_dict(data)
+        if self.kind in type(self).DICT_KINDS: self.log = self._decode_dict(data)
         else: self.log = self._decode_str(data)
     
 
