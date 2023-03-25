@@ -1,8 +1,9 @@
-import uuid
-from dvic_log_server.network.packets import PacketInteractiveSession, Packet
+import random, string
+from dvic_log_server.network.packets import PacketInteractiveSession, Packet, PacketFileTransfer
 
 import dvic_log_server.connection as co
 import dvic_log_server.api as api
+from dvic_log_server.logs import error, info, warning
 
 INTERACTIVE_SESSIONS = {}
 
@@ -12,7 +13,24 @@ class InteractiveSession:
         self.target_machine = target_machine
         self.target_executable = target_executable
         self.subscribers: list[co.Connection] = []
+        self.running = True
         self.target_machine.send_packet(PacketInteractiveSession(self.id, executable=self.target_executable)) # initial packet to start interactive session
+
+    def _print_log(self, log_fn: callable, log_line: str):
+        log_fn(f'[SESSION] ({self.uid}) {log_line}')
+
+    def error(self, log_line: str):
+        self._print_log(error, log_line)
+
+    def info(self, log_line: str):
+        self._print_log(info, log_line)
+
+    def warning(self, log_line: str):
+        self._print_log(warning, log_line)
+
+    @property
+    def uid(self):
+        return self.id
 
     def push(self, c: bytes):
         """Push a char from client to node
@@ -20,8 +38,9 @@ class InteractiveSession:
         Parameters
         ----------
         c : bytes
-            The char to send. The size can be >1 for utf8 compatibility
+            The char(s) to send. The size can be >1 for utf8 compatibility or script execution
         """
+        if not self.running: return
         self.target_machine.send_packet(PacketInteractiveSession(self.id, value=c))
 
     def pull(self, c: bytes):
@@ -39,7 +58,8 @@ class InteractiveSession:
             c.send_packet(pck)
 
     def kill(self, ret_value: int = None, msg: str = None):
-        print(f'[SESSION] {self.id} terminated with code {ret_value} and message: {msg}')
+        self.running = False
+        self.info(f'Terminated with code {ret_value} and message: {msg}')
         p = PacketInteractiveSession(self.id, 
                                      value=msg if msg is not None else f'Interactive session terminated with error code {ret_value}.', 
                                      return_value = ret_value
@@ -69,7 +89,7 @@ class InteractiveSession:
                 
                 session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine])
                 INTERACTIVE_SESSIONS[pck.uuid] = session
-                print(f'[SESSION] Registered session {pck.uuid}')
+                session.info(f'Registered session')
                 # subscribe sender
                 session.subscribe(src)
                 return 
@@ -88,9 +108,61 @@ class InteractiveSession:
         if pck.action is not None:
             if pck.action == "register":
                 session.subscribe(src)
-                print(f'[SESSION] Registered {src.uid} on session [{pck.uuid}]')
+                session.info(f'Registered {src.uid} on session')
                 return
         
         # identify if we push or pull data
         method = session.pull if src is session.target_machine else session.push
         method(pck.value)
+
+
+
+class ScriptInteractiveSession(InteractiveSession):
+    SCRIPT_EXEC_UPLOAD = "upload"
+    SCRIPT_EXEC_PUSH   = "push"
+
+    """ScriptInteractiveSession
+    This interactive session is automated via a script whose content is given in script_content
+    The script execution can be done in 2 ways: 
+        - Upload the script on the target machine and run it from the interactive session
+        - Send the script line by line from the server to the node.
+    """
+    def __init__(self, uid, target_machine: co.Connection, script_content: str, interpreter: str = "/bin/bash", script_exec_method: str = SCRIPT_EXEC_UPLOAD) -> None:
+        super().__init__(uid, target_machine, interpreter)
+        self.script_content: str = script_content
+        self.gen_name: str = self._random_name()
+        self.exec_method = script_exec_method
+        if self.exec_method not in [ScriptInteractiveSession.SCRIPT_EXEC_PUSH, ScriptInteractiveSession.SCRIPT_EXEC_UPLOAD]:
+            raise Exception(f'Invalid exec method {script_exec_method}')
+
+    def _random_name(self):
+        return ''.join(random.choices(string.ascii_lowercase + string.digits, k = 10))
+
+    def _upload_script(self):
+        self.info(f'Uploading script to machine {self.target_machine.uid} with name {self.gen_name} ({len(self.script_content)} bytes)')
+        self.target_machine.send_packet(PacketFileTransfer(f'/tmp/{self.gen_name}', content=self.script_content.encode(), mode="600", owner="root"))
+
+    def push_line(self, line: str):
+        self.push(line.encode()+b'\n')
+
+    def run_script(self):
+        if self.exec_method == ScriptInteractiveSession.SCRIPT_EXEC_UPLOAD:
+            self._upload_script()
+            #TODO delay for upload and execute
+        else: #Push
+            self.info(f'Pushing script on console')
+            for line in self.script_content.split('\n'):
+                self.push_line(line)
+
+
+class SSHScriptInteractiveSession(ScriptInteractiveSession):
+    """SSHScriptInteractiveSession
+    This class is the same as SSHScriptInteractiveSession but will attempt to connect to the REMOTE_HOST ssh server on port PORT with the provided credentials
+    Once the connection is established, the script is uploaded to the REMOTE_HOST
+    """
+
+    def __init__(self, uid, target_machine: co.Connection, username: str, hostname: str, password: str = None) -> None:
+        super().__init__(uid, target_machine, "/bin/bash", script_exec_method=ScriptInteractiveSession.SCRIPT_EXEC_PUSH)
+        self.push_line(f'ssh {username}@{hostname} || exit 1')
+        if password is not None:
+            self.push_line(password)
