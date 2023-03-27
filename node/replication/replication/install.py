@@ -22,8 +22,8 @@ class InstallationHandler():
                                     stderr=subprocess.PIPE,
                                     shell=True) #! It seems that shell=False is more secure than shell=True and avoid shell injection
         # Write a log into a file to ensure that the connection is established
-        # self.ssh_connection.stdin.write(b'echo "Connection established" > /home/wanikatako/log.txt\n')
-        # self.ssh_connection.stdin.flush()
+        self.ssh_connection.stdin.write(b'echo "Connection established" > /home/wanikatako/log.txt\n')
+        self.ssh_connection.stdin.flush()
         return self.ssh_connection
 
     def _copy_installation_script(self) -> None:
@@ -73,4 +73,4 @@ if __name__ == '__main__':
     usr = InstallationHandler('wanikatako', 'localhost')
     # usr.installation()
     usr._start_connection()
-    usr._run_command_ssh('bash /home/wanikatako/install_script.sh')
+    # usr._run_command_ssh('bash /home/wanikatako/install_script.sh')

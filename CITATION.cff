@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+title: Dvic demonstration monitoring
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Matthieu
+    family-names: SEGUI
+    affiliation: DeVinci Innovation Center
+  - given-names: Grégor
+    family-names: JOUET
+    affiliation: DeVinci Innovation Center
+repository-code: 'https://github.com/matthieu-sgi/DVIC_Demo_Monitoring'
+date-released: 2021-02-19
