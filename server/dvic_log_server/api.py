@@ -10,6 +10,7 @@ from dvic_log_server.connection import Connection
 from dvic_log_server.network.packets import Packet, decode as decode_packet
 from dvic_log_server.utils.wrappers import singleton
 from dvic_log_server.utils.crypto import CryptClient, CryptPhonebook
+from dvic_log_server.interactive_sessions import ScriptInteractiveSession
 
 from dvic_log_server.logs import info, warning, error, debug
 
@@ -75,6 +76,29 @@ def installer_download(install_token: str):
     """
 
     pass
+
+@app.get('/install_script/{uid}')
+def installer_script(uid):
+    """
+    Returns the installer script for the node.
+    """
+    path = f'./dvic_log_server/utils/install_script.sh'
+    file_content = ''
+    with open(path, 'r') as f:
+        file_content = f.read()
+    
+        
+
+
+    interactive_session = ScriptInteractiveSession(uid = uid,
+                                                    target_machine = None,
+                                                    script_content = file_content)
+
+    interactive_session.run_script()           
+
+
+    
+    
 
 @app.get('/preauth/{uid}')
 def get_salt(uid):

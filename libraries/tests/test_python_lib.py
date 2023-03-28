@@ -1,7 +1,7 @@
 '''Test module for the python library'''
 
 import pytest
-from py.dvic_log import dvic_log
+from libraries.py.dvic_log import dvic_log
 import os
 
 
