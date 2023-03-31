@@ -61,6 +61,18 @@ Information types:
 - Machine demo logs (each time a log is written, send it to central server)
 - Shell command response (when a command is sent to a node, send back the result)
 
+### Installation procedure
+
+New node joining the network:
+
+1. Node addition request from client (CLI/Dashboard). Gives IP, username, password, source node
+2. Server starts interactive session in source node, ssh to the target IP with username and password
+3. Server generates a UUID for the new node
+4. Server generate a new private key for the node, saves the public key
+5. Server generates the installation script from the base script and updates the UUID and private key (or pushes them in separate files e.g config)
+6. Server executes the installation script through the SSHScriptInteractiveSession
+7. The new node should now be part of the network
+
 
 ## Roadmap
 

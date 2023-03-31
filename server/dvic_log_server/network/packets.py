@@ -15,7 +15,8 @@ PACKET_ID_MATCHING = {
     "demo_proc_state": "DemoProcState",
     "machine_log" : "MachineLog",
     "interactive_session": "InteractiveSession",
-    "node_status": "NodeStatus"
+    "node_status": "NodeStatus",
+    "node_addition_request": "NodeAdditionRequest"
 } # identifier -> str(class<Packet>)
 
 @dataclass
@@ -75,7 +76,7 @@ class Packet:
         """
         raise NotImplementedError()
 
-    def set_data(self, data: dict) -> "Packet":
+    def set_data(self, data: dict) -> None:
         """set the data values of the class form a dict representation
 
         Parameters
@@ -102,6 +103,47 @@ class PacketNodeConfig(Packet):
     def __init__(self, mode: str = None, key: str = None, value: str = None) -> None:
         super().__init__("node_config_update")
 
+class PacketNodeAdditionRequest(Packet):
+    def __init__(self, ip: str = None, username: str = None, password: str = None, source_node_uid: str = None) -> None:
+        super().__init__("node_addition_request")
+        self.ip = ip
+        self.username = username
+        self.password = password
+        self.source_node_uid = source_node_uid
+    
+    def get_data(self) -> dict:
+        return {
+            "ip": self.ip,
+            "username": self.username,
+            "password": self._encode_str(self.password),
+            "source_node_uid": self.source_node_uid
+        }
+    
+    def set_data(self, data: dict) -> None:
+        self.ip = data['ip']
+        self.username = data['username']
+        self.password = self._decode_str(data['password'])
+        self.source_node_uid = data['source_node_uid']
+
+class PacketNodeAdditionManagement(Packet):
+    def __init__(self, node_uid: str = None, state: str = None, message: str = None) -> None:
+        super().__init__("node_addition_management")
+        self.node_uid = node_uid
+        self.state = state
+        self.message = message
+
+    def get_data(self) -> dict:
+        return {
+            "node_uid": self.node_uid,
+            "state": self.state,
+            "message": self._encode_str(self.message)
+        }    
+
+    def set_data(self, data: dict) -> None:
+        self.node_uid = data['node_uid']
+        self.state = data['state']
+        self.message = self._decode_str(data['message'])
+
 
 class PacketNodeStatus(Packet):
     # ? what is this packet for?
@@ -119,7 +161,6 @@ class PacketNodeStatus(Packet):
     def set_data(self, data: dict) -> Packet:
         self.action = NodeStatusAction(data['action']) if data['action'] is not None else None
         self.node_status = data['node_status']
-        return self
 
 class PacketHardwareState(Packet): #! I changed all the "log" to "data" ;)
     '''Hardware state contains info about the temperature, memory usage, etc. of the machine'''
@@ -221,7 +262,6 @@ class PacketInteractiveSession(Packet):
         self.return_value = data['return_value'] if "return_value" in data else None
         self.target_machine = data['target_machine'] if 'target_machine' in data else None
         self.action = data['action'] if 'action' in data else None
-        return self
 
 
 def decode(source: str) -> Packet:

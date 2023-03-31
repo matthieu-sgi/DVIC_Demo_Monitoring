@@ -2,7 +2,9 @@ from fastapi import WebSocket
 
 import asyncio
 from dvic_log_server.network.packets import *
+from dvic_log_server.api import ConnectionManager
 from multiprocessing import Queue
+from dvic_log_server.logs import info, warning, error, debug
 from dvic_log_server.database_drivers import ElasticConnector
 
 from time import time
@@ -113,6 +115,13 @@ class Connection:
                          'timestamp': time()}
         elk.insert(dict_to_store)
     
+    def _handle_node_addition_request(self, pck: PacketNodeAdditionRequest):
+        cm = ConnectionManager()
+        # TODO create connection addition with retry and timeout
+        if cm[pck.source_node_uid] is None:
+            pass
+
+
     def _handle_demo_proc_state(self, pck: PacketDemoProcState):
         '''Handle a demo process state packet'''
         raise NotImplementedError()
