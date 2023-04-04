@@ -132,7 +132,19 @@ class Connection:
             pass
         
         
-        SSHScriptInteractiveSession(None, cm[pck.source_node_uid], pck.username, pck.ip, pck.password)
+        def post_install_hook(session: SSHScriptInteractiveSession, return_value: int, message: str):
+            if return_value == 0:
+                # ok, new node install successful
+                pass
+            else:
+                # not ok, new node did not install, disregard the generated node id+ key
+                pass
+
+        specific_script = "" #TODO install script parsed with the template and new node uid, private key are replaced
+        session = SSHScriptInteractiveSession(None, cm[pck.source_node_uid], specific_script, pck.username, pck.ip, pck.password)
+        session.register_termination_hook(post_install_hook)
+        session.run_script()
+        info(f'Installing new node via session {session.uid}')
 
 
     def _handle_demo_proc_state(self, pck: PacketDemoProcState):

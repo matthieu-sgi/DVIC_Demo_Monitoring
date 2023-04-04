@@ -5,6 +5,7 @@ import dvic_log_server.connection as co
 import dvic_log_server.api as api
 from dvic_log_server.logs import error, info, warning
 import uuid
+import traceback
 
 INTERACTIVE_SESSIONS = {}
 
@@ -21,6 +22,10 @@ class InteractiveSession:
         self.subscribers: list[co.Connection] = []
         self.running = True
         self.target_machine.send_packet(PacketInteractiveSession(self.id, executable=self.target_executable)) # initial packet to start interactive session
+        self.hooks = []
+
+    def register_termination_hook(self, fct: callable):
+        self.hooks.append(fct)
 
     def _print_log(self, log_fn: callable, log_line: str):
         log_fn(f'[SESSION] ({self.uid}) {log_line}')
@@ -76,6 +81,12 @@ class InteractiveSession:
         self.dispatch(p)
         for c in self.subscribers:
             self.unsubscribe(c)
+        for h in self.hooks:
+            try:
+                h(self, ret_value, msg)
+            except:
+                error(f'Error in termination hook {h}')
+                traceback.print_exc()
 
     def subscribe(self, co: co.Connection):
         self.subscribers.append(co)
@@ -180,6 +191,19 @@ class SSHScriptInteractiveSession(ScriptInteractiveSession):
         self.push_line(f'ssh {username}@{hostname} || exit 1')
         if password is not None:
             self.push_line(password)
+        self.psd = password
+
+    def run_script(self):
+        ensure_sudo_script = f"""
+if sudo -n true 2>/dev/null; then 
+    sudo su
+else
+    echo "{self.password}" | sudo -S su"
+fi
+[[ `id -u` == 0 ]] || exit 1
+        """
+        for l in ensure_sudo_script: self.push_line(l)
+        return super().run_script()
 
     def _get_script_content(self, script_path_or_content: str):
         from os import path
