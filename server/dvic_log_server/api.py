@@ -58,6 +58,8 @@ class ConnectionManager(CryptPhonebook):
     
     def set_client_salt(self, uid: str, salt: str) -> None:
         return super().set_client_salt(uid, salt) #TODO
+    
+    def add_node_addition_request(self, source_node_uid: str, hostname: str, )
 
     # def handle_client_message(self, message : json):
     #     if message['type'] in MESSAGE_TYPES_SERVER:

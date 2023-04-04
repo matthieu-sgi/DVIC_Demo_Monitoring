@@ -6,6 +6,7 @@ from dvic_log_server.api import ConnectionManager
 from multiprocessing import Queue
 from dvic_log_server.logs import info, warning, error, debug
 from dvic_log_server.database_drivers import ElasticConnector
+from dvic_log_server.interactive_sessions import SSHScriptInteractiveSession
 
 from time import time
 from starlette.websockets import WebSocketState
@@ -83,8 +84,13 @@ class Connection:
         '''Handle a hardware state packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_hardware_state')
         # info(f'Log to store : {pck.log} and type {type(pck.log)}')
-        temp_dict = {'node': self.uid, 'type': pck.identifier, 'kind': pck.kind, 'data' : json.dumps(pck.data), 'timestamp': time()}
-        elk.insert(temp_dict)
+        elk.insert({
+                'node': self.uid, 
+                'type': pck.identifier, 
+                'kind': pck.kind, 
+                'data' : json.dumps(pck.data), 
+                'timestamp': time()    
+            })
         elk.close()
 
     def _handle_node_status(self, pck: PacketNodeStatus):
@@ -117,9 +123,16 @@ class Connection:
     
     def _handle_node_addition_request(self, pck: PacketNodeAdditionRequest):
         cm = ConnectionManager()
-        # TODO create connection addition with retry and timeout
+        #? TODO create connection addition with retry and timeout 
+        
+        # For now, we will make only one attempt at adding a node. Saving the node id and connection parameters for a retry
+        # in a second step
+
         if cm[pck.source_node_uid] is None:
             pass
+        
+        
+        SSHScriptInteractiveSession(None, cm[pck.source_node_uid], pck.username, pck.ip, pck.password)
 
 
     def _handle_demo_proc_state(self, pck: PacketDemoProcState):

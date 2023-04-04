@@ -4,12 +4,18 @@ from dvic_log_server.network.packets import PacketInteractiveSession, Packet, Pa
 import dvic_log_server.connection as co
 import dvic_log_server.api as api
 from dvic_log_server.logs import error, info, warning
+import uuid
 
 INTERACTIVE_SESSIONS = {}
 
 class InteractiveSession:
     def __init__(self, uid, target_machine: co.Connection, target_executable: str = "/bin/bash") -> None:
         self.id = uid
+        if self.id == None:
+            # Special case of API initiated InteractiveSession: we create the UUID ourselves
+            # we also must register the session in the general interactive session dict at this point
+            self.id = self._generate_uid()
+            InteractiveSession._init_interactive_session(self)
         self.target_machine = target_machine
         self.target_executable = target_executable
         self.subscribers: list[co.Connection] = []
@@ -27,6 +33,9 @@ class InteractiveSession:
 
     def warning(self, log_line: str):
         self._print_log(warning, log_line)
+
+    def _generate_uid(self) -> str:
+        return str(uuid.uuid4())
 
     @property
     def uid(self):
@@ -75,6 +84,12 @@ class InteractiveSession:
     def unsubscribe(self, co: co.Connection):
         self.subscribers.remove(co)
 
+
+    @staticmethod
+    def _init_interactive_session(session: "InteractiveSession"):
+        INTERACTIVE_SESSIONS[session.uid] = session
+        session.info(f'Registered session')
+
     @staticmethod
     def handle_packet(src: co.Connection, pck: PacketInteractiveSession):
         # if interactive session does not exist
@@ -88,8 +103,6 @@ class InteractiveSession:
                 # create interactive session, this sends the initial packet
                 
                 session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine])
-                INTERACTIVE_SESSIONS[pck.uuid] = session
-                session.info(f'Registered session')
                 # subscribe sender
                 session.subscribe(src)
                 return 
@@ -102,6 +115,7 @@ class InteractiveSession:
         if pck.return_value is not None:
             # kill session, remove session, return
             session.kill(pck.return_value, pck.value)
+            del INTERACTIVE_SESSIONS[session.uid]
             return
         
         # handle special action
@@ -161,8 +175,15 @@ class SSHScriptInteractiveSession(ScriptInteractiveSession):
     Once the connection is established, the script is uploaded to the REMOTE_HOST
     """
 
-    def __init__(self, uid, target_machine: co.Connection, username: str, hostname: str, password: str = None) -> None:
-        super().__init__(uid, target_machine, "/bin/bash", script_exec_method=ScriptInteractiveSession.SCRIPT_EXEC_PUSH)
+    def __init__(self, uid, target_machine: co.Connection, script_path_or_content: str, username: str, hostname: str, password: str = None) -> None:
+        super().__init__(uid, target_machine, self._get_script_content(script_path_or_content), "/bin/bash", script_exec_method=ScriptInteractiveSession.SCRIPT_EXEC_PUSH)
         self.push_line(f'ssh {username}@{hostname} || exit 1')
         if password is not None:
             self.push_line(password)
+
+    def _get_script_content(self, script_path_or_content: str):
+        from os import path
+        if path.isfile(script_path_or_content):
+            with open(script_path_or_content) as fh:
+                return fh.read()
+        return script_path_or_content
