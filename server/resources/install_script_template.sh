@@ -43,12 +43,12 @@ EOF
 # Only the initial install is required here
 # push & run installer.py
 
-cat > /opt/dvic-demo-watcher/installer.py << EOF
-{{ INSTALLER_SCRIPT_CONTENT }}
+cat > /opt/dvic-demo-watcher/updater.py << EOF
+{{ UPDATER_SCRIPT_CONTENT }}
 EOF
 
 # with set -e is the script fails the installation is marked as unsuccessful
-python3 /opt/dvic-demo-watcher/installer.py
+python3 /opt/dvic-demo-watcher/updater.py
 
 systemctl daemon-reload
 systemctl enable dvic_demo_watcher
