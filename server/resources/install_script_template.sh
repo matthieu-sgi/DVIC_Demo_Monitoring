@@ -11,6 +11,7 @@ python3 -c "import sys; assert sys.version_info.major == 3; assert sys.version_i
 
 # Create folder structure
 mkdir -p /opt/dvic-demo-watcher
+cd /opt/dvic-demo-watcher
 
 # Configuration
 cat > /opt/dvic-demo-watcher/private.key << EOF
@@ -20,8 +21,8 @@ EOF
 cat > /opt/dvic-demo-watcher/config.yml << EOF
 uid: {{ NODE_UID }}
 private_key_path: /opt/dvic-demo-watcher/private.key
-server_root_path: wss://dvic.devinci.fr/demo_watcher/api
-latest_update_source: https://dvic.devinci.fr/demo_watcher/release.zip
+server_root_path: {{ SERVER_ROOT_PATH }}
+latest_install_source: {{ UPDATE_SOURCE }}
 EOF
 
 cat /opt/dvic-demo-watcher/config.yml
@@ -38,8 +39,16 @@ ExecStart=/opt/dvic-demo-watcher/dvic_client.py
 EOF
 
 
-#TODO install/ upgrade?
-# push & run update.py 
+# Update can be done with SSHSCript later
+# Only the initial install is required here
+# push & run installer.py
+
+cat > /opt/dvic-demo-watcher/installer.py << EOF
+{{ INSTALLER_SCRIPT_CONTENT }}
+EOF
+
+# with set -e is the script fails the installation is marked as unsuccessful
+python3 /opt/dvic-demo-watcher/installer.py
 
 systemctl daemon-reload
 systemctl enable dvic_demo_watcher
