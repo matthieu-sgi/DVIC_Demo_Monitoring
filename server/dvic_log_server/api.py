@@ -7,7 +7,7 @@ import asyncio
 import os
 
 from dvic_log_server.connection import Connection
-from dvic_log_server.network.packets import Packet, decode as decode_packet
+from dvic_log_server.network.packets import Packet, PacketNodeAdditionRequest, decode as decode_packet
 from dvic_log_server.utils.wrappers import singleton
 from dvic_log_server.utils.crypto import CryptClient, CryptPhonebook
 from dvic_log_server.interactive_sessions import ScriptInteractiveSession
@@ -59,7 +59,7 @@ class ConnectionManager(CryptPhonebook):
     def set_client_salt(self, uid: str, salt: str) -> None:
         return super().set_client_salt(uid, salt) #TODO
     
-    def add_node_addition_request(self, source_node_uid: str, hostname: str, )
+    # def add_node_addition_request(self, source_node_uid: str, hostname: str, )
 
     # def handle_client_message(self, message : json):
     #     if message['type'] in MESSAGE_TYPES_SERVER:
@@ -79,10 +79,16 @@ class ConnectionManager(CryptPhonebook):
 
 #     pass
 
-@app.get('/install_script/{uid}')
-def installer_script(uid):
+@app.get('/install_script/uid_node={uid}')
+def installer_script(uid : str):
     """
     Returns the installer script for the node.
+
+    ---------
+    args:
+        uid: the UID of the node installer
+        target_ip: the IP of the node that will be installed
+
     """
     path = f'./dvic_log_server/utils/install_script.sh'
     file_content = ''
@@ -93,7 +99,7 @@ def installer_script(uid):
 
 
     interactive_session = ScriptInteractiveSession(uid = uid,
-                                                    target_machine = None,
+                                                    target_machine = target_ip,
                                                     script_content = file_content)
 
     interactive_session.run_script()           

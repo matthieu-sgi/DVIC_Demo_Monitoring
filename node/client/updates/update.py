@@ -1,5 +1,6 @@
 #!/bin/python3
 
+import subprocess
 import requests
 import zipfile
 
@@ -8,6 +9,8 @@ import zipfile
 
 VERSION_FILE_URL = 'http://localhost:8000/version'
 UPDATE_FILE_URL = 'http://localhost:8000/update'
+PATH = '/opt/dvic_log_server'
+SERVICE_NAME = 'dvic_log_server'
 
 
 
@@ -31,6 +34,20 @@ def extract_update():
     with zipfile.ZipFile('update.zip', 'r') as zip_ref:
         zip_ref.extractall('.')
 
+def restart_service():
+    try :
+        subprocess.run(['systemctl', 'restart', SERVICE_NAME])
+    
+    except OSError as e:
+        print(e)
+        print('Failed to restart service. Please restart manually.')
+    
+    except Exception as e:
+        print(e)
+        print('Failed to restart service. Please restart manually.')
+        # TODO : push error to server. Through log ? 
+
+
 # Main method to check for updates and download them if necessary
 
 def check_for_updates():
@@ -41,9 +58,13 @@ def check_for_updates():
         download_update()
         print('Extracting...')
         extract_update()
-        print('Done. Please restart the program.')
+        print('Restarting service...')
+        restart_service()
+        print('Done.')
     else:
         print('No updates available.')
+
+    
 
 if __name__ == '__main__':
     check_for_updates()

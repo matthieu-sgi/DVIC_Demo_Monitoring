@@ -12,13 +12,36 @@ if __name__ == '__main__':
     manager = DataAggregatorManager()
 
     # Testing the hardware info collector
-    hi = HardwareInfo(client=client)
-    manager.add_data_aggregator(hi)
+    # hi = HardwareInfo(client=client)
+    # manager.add_data_aggregator(hi)
 
     # Testing the log reader collector
     log_r_2 = LogReader(client = client, journal_unit='systemd-journald')
     manager.add_data_aggregator(log_r_2)
 
+    log_r_3 = LogReader(client = client, journal_unit='nm_dispatcher')
+    manager.add_data_aggregator(log_r_3)
+
+    log_r_4 = LogReader(client = client, journal_unit='systemd-udevd')
+    manager.add_data_aggregator(log_r_4)
+
+    log_r_5 = LogReader(client = client, journal_unit='systemd-timesyncd')
+    manager.add_data_aggregator(log_r_5)
+
+    log_r_6 = LogReader(client = client, journal_unit='systemd-networkd')
+    manager.add_data_aggregator(log_r_6)
+
+    log_r_7 = LogReader(client = client, journal_unit='systemd-resolved')
+    manager.add_data_aggregator(log_r_7)
+
+    log_r_8 = LogReader(client = client, journal_unit='systemd-logind')
+    manager.add_data_aggregator(log_r_8)
+
+    log_r_9 = LogReader(client = client, journal_unit='systemd-hostnamed')
+    manager.add_data_aggregator(log_r_9)
+
+    log_r_10 = LogReader(client = client, journal_unit='systemd-tmpfiles-clean')
+    manager.add_data_aggregator(log_r_10)
     # Testing the log
     # Get the name of the log file 
     # files = os.listdir('/tmp/dvic_demo_log_fifo')
