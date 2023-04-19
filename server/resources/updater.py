@@ -3,12 +3,14 @@ from tqdm import tqdm
 import os
 import sys
 import requests
+import subprocess
 import tarfile
 import yaml
 import os
 
 TEMP_DOWNLOAD_PATH = '/tmp/dvic_monitor_latest.zip'
 CONFIG_FILE = './config.yml'
+SERVICE_NAME = 'dvic_demo_watcher.service'
 
 class Installer:
 
@@ -22,6 +24,19 @@ class Installer:
     @property
     def update_url(self):
         return self.config['latest_update_source']
+    
+    def restart_service(): #! Maybe this will be done by using interactive session
+        try :
+            subprocess.run(['systemctl', 'restart', SERVICE_NAME])
+        
+        except OSError as e:
+            print(e)
+            print('Failed to restart service. Please restart manually.')
+        
+        except Exception as e:
+            print(e)
+            print('Failed to restart service. Please restart manually.')
+
 
     def install(self):
 

@@ -41,7 +41,7 @@ EOF
 
 # Update can be done with SSHSCript later
 # Only the initial install is required here
-# push & run installer.py
+# push & run installer.py #? installer.py or updater.py?
 
 cat > /opt/dvic-demo-watcher/updater.py << EOF
 {{ UPDATER_SCRIPT_CONTENT }}
