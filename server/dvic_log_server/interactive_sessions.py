@@ -1,7 +1,7 @@
 import random, string
 from dvic_log_server.network.packets import PacketInteractiveSession, Packet, PacketFileTransfer
 
-import dvic_log_server.connection as co
+from dvic_log_server.meta import AConnection
 import dvic_log_server.api as api
 from dvic_log_server.logs import error, info, warning
 import uuid
@@ -10,7 +10,7 @@ import traceback
 INTERACTIVE_SESSIONS = {}
 
 class InteractiveSession:
-    def __init__(self, uid, target_machine: co.Connection, target_executable: str = "/bin/bash") -> None:
+    def __init__(self, uid, target_machine: AConnection, target_executable: str = "/bin/bash") -> None:
         self.id = uid
         if self.id == None:
             # Special case of API initiated InteractiveSession: we create the UUID ourselves
@@ -19,7 +19,7 @@ class InteractiveSession:
             InteractiveSession._init_interactive_session(self)
         self.target_machine = target_machine
         self.target_executable = target_executable
-        self.subscribers: list[co.Connection] = []
+        self.subscribers: list[AConnection] = []
         self.running = True
         self.target_machine.send_packet(PacketInteractiveSession(self.id, executable=self.target_executable)) # initial packet to start interactive session
         self.hooks = []
@@ -88,38 +88,51 @@ class InteractiveSession:
                 error(f'Error in termination hook {h}')
                 traceback.print_exc()
 
-    def subscribe(self, co: co.Connection):
+    def subscribe(self, co: AConnection):
         self.subscribers.append(co)
         #TODO screen-like session with server maintained state
 
-    def unsubscribe(self, co: co.Connection):
+    def unsubscribe(self, co: AConnection):
         self.subscribers.remove(co)
 
 
     @staticmethod
     def _init_interactive_session(session: "InteractiveSession"):
+        global INTERACTIVE_SESSIONS
         INTERACTIVE_SESSIONS[session.uid] = session
+        print('registered')
         session.info(f'Registered session')
 
     @staticmethod
-    def handle_packet(src: co.Connection, pck: PacketInteractiveSession):
+    def handle_packet(src: AConnection, pck: PacketInteractiveSession):
+        
+        # print(INTERACTIVE_SESSIONS)
         # if interactive session does not exist
         if pck.uuid not in INTERACTIVE_SESSIONS:
             # if this is initial packet with target machine and executable
-            if pck.target_machine is not None:
-                # check if the machine is available
-                if api.ConnectionManager()[pck.target_machine] is None:
-                    src.send_packet(PacketInteractiveSession(pck.uuid, return_value=-1, value=f'[SERVER] Machine {pck.target_machine} is not online.'))
-                    return
-                # create interactive session, this sends the initial packet
-                
-                session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine])
-                # subscribe sender
-                session.subscribe(src)
-                return 
-            else:
+            if pck.target_machine is None:
+                src.send_packet(PacketInteractiveSession(pck.uuid, return_value=-1, value=f'[SERVER] No target machine provided or attempted to join an invalid session id.'))
+                return
+
+            # check if the machine is available
+            if api.ConnectionManager()[pck.target_machine] is None:
+                src.send_packet(PacketInteractiveSession(pck.uuid, return_value=-1, value=f'[SERVER] Machine {pck.target_machine} is not online.'))
+                return
+            
+            # check executable is there
+            
+            if pck.executable is None:
                 src.send_packet(PacketInteractiveSession(pck.uuid, return_value=-1, value=f'[SERVER] Initial Interactive Session packet must contain an executable.'))
                 return
+
+            # create interactive session, this sends the initial packet
+            session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine])
+            InteractiveSession._init_interactive_session(session)
+            # subscribe sender
+            session.subscribe(src)
+            return
+
+           
 
         session: InteractiveSession = INTERACTIVE_SESSIONS[pck.uuid]
         # if this is ret_value (final) packet
@@ -152,7 +165,7 @@ class ScriptInteractiveSession(InteractiveSession):
         - Upload the script on the target machine and run it from the interactive session
         - Send the script line by line from the server to the node.
     """
-    def __init__(self, uid, target_machine: co.Connection, script_content: str, interpreter: str = "/bin/bash", script_exec_method: str = SCRIPT_EXEC_UPLOAD) -> None:
+    def __init__(self, uid, target_machine: AConnection, script_content: str, interpreter: str = "/bin/bash", script_exec_method: str = SCRIPT_EXEC_UPLOAD) -> None:
         super().__init__(uid, target_machine, interpreter)
         self.script_content: str = script_content
         self.gen_name: str = self._random_name()
@@ -186,7 +199,7 @@ class SSHScriptInteractiveSession(ScriptInteractiveSession):
     Once the connection is established, the script is uploaded to the REMOTE_HOST
     """
 
-    def __init__(self, uid, target_machine: co.Connection, script_path_or_content: str, username: str, hostname: str, password: str = None) -> None:
+    def __init__(self, uid, target_machine: AConnection, script_path_or_content: str, username: str, hostname: str, password: str = None) -> None:
         super().__init__(uid, target_machine, self._get_script_content(script_path_or_content), "/bin/bash", script_exec_method=ScriptInteractiveSession.SCRIPT_EXEC_PUSH)
         self.push_line(f'ssh {username}@{hostname} || exit 1')
         if password is not None:

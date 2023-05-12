@@ -83,7 +83,8 @@ class CryptClient():
         if not phone_book.is_secure_auth_enabled():
             return uid, True
         key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))
-        return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature))
+        exst = plaintext[UUID_LEN:UUID_LEN+SALT_LEN]
+        return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature)) and exst == phone_book.get_client_salt(uid)
     
     def encode_b64_for_url(self, b64: str):
         # '+/=' > '*_-'
@@ -96,9 +97,29 @@ if __name__ == '__main__':
     import uuid
     #! fixme: cannot crete salt on client side because of replay attacks
     client = CryptClient(private_key='./testing/client1.private')
+    s =  CryptClient.get_salt()
     u = 'e118857e-3732-4e58-aa9c-56685c6a6492' # str(uuid.uuid4())
-    pck = client.craft_initial_token(u, CryptClient.get_salt())
-    print(pck)
+    pck = client.craft_initial_token(u, s)
+    print(f'uuid={u}')
+    print(f'salt={s}')
+    print(f'exst={pck[UUID_LEN:UUID_LEN+SALT_LEN]}')
+    print(f'pck={pck}')
+
+
     server = CryptClient(private_key='./testing/api.private')
 
-    print(server.verify_initial_packet(pck, './testing/client1.public'))
+    class FS(CryptPhonebook):
+
+        def is_secure_auth_enabled(self) -> bool:
+            return True
+        
+        def get_client_salt(self, uid: str) -> str:
+            return s
+        
+        def set_client_salt(self, uid: str, salt: str) -> None:
+            pass
+
+        def get_public_key(self, uid: str) -> str:
+            return './testing/client1.public'
+
+    print(server.verify_initial_packet(pck, FS()))

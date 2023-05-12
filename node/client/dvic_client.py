@@ -25,22 +25,32 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
     def __init__(self):        
         super().__init__()
         self.send_queue = Queue()
+        self.config = {} # read config
         self.interactive_sessions: dict[str, InteractiveSession] = {}
 
-    def get_public_key(self, uid: str) -> str:
-        return super().get_public_key(uid) #TODO
 
-    def get_client_salt(self, uid: str) -> str:
-        return super().get_client_salt(uid) #TODO
+    def read_config(self):
+        """
+            uid: {{ NODE_UID }}
+            private_key_path: /opt/dvic-demo-watcher/private.key
+            server_root_path: {{ SERVER_ROOT_PATH }}
+            latest_install_source: {{ UPDATE_SOURCE }}
+        """ 
+        pass # TODO 
+
+    def get_public_key(self,  uid: str) -> str: 
+        return None
     
-    def set_client_salt(self, uid: str, salt: str) -> None:
-        return super().set_client_salt(uid, salt) #TODO
+    def get_client_salt(self, _: str) -> str: return None
+    def set_client_salt(self, uid: str, salt: str) -> None: return
 
 
     def _craft_auth_token(self): 
         if not self.is_secure_auth_enabled():
             print(f'[AUTH] Bypassing auth')
             return self.uid
+        
+        # Preauth here
         raise NotImplementedError()
         #TODO 
 

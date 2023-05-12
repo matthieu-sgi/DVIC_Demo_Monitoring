@@ -6,7 +6,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import asyncio
 import os
 
-from dvic_log_server.connection import Connection
+
+from dvic_log_server.meta import AConnection
 from dvic_log_server.network.packets import Packet, PacketNodeAdditionRequest, decode as decode_packet
 from dvic_log_server.utils.wrappers import singleton
 from dvic_log_server.utils.crypto import CryptClient, CryptPhonebook
@@ -19,7 +20,7 @@ app = FastAPI()
 @singleton
 class ConnectionManager(CryptPhonebook):
     def __init__(self):
-        self.connections: dict[str, Connection] = {}
+        self.connections: dict[str, AConnection] = {}
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         #remove the 'dvic_log_server' part of the path
         self.log_path = self.log_path[:self.log_path.rfind('/')]
@@ -27,7 +28,7 @@ class ConnectionManager(CryptPhonebook):
             self.private_key_path = None
             warning(f'The API is configured to IGNORE cryptographic client authentication. DO NOT do this in a production setting.')
     
-    def __setitem__(self, uid: str, connection: Connection) -> None:
+    def __setitem__(self, uid: str, connection: AConnection) -> None:
         if connection is None:
             pass #TODO trigger disconnection 
         
@@ -49,7 +50,7 @@ class ConnectionManager(CryptPhonebook):
     def get_public_key(self, uid: str) -> str:
         return "" #TODO return public key
 
-    def __getitem__(self, uid: str) -> Connection:
+    def __getitem__(self, uid: str) -> AConnection:
         if uid not in self.connections: return None
         return self.connections[uid]
     
@@ -132,6 +133,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
         await websocket.close()
         return
 
+    from dvic_log_server.connection import Connection # needed for init but cannot import before or cycle dependencies
     conn = Connection(websocket, uid)
     ConnectionManager()[uid] = conn 
 

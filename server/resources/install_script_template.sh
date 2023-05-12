@@ -18,14 +18,14 @@ cat > /opt/dvic-demo-watcher/private.key << EOF
 {{ PRIVATE_KEY }}
 EOF
 
-cat > /opt/dvic-demo-watcher/config.yml << EOF
-uid: {{ NODE_UID }}
-private_key_path: /opt/dvic-demo-watcher/private.key
-server_root_path: {{ SERVER_ROOT_PATH }}
-latest_install_source: {{ UPDATE_SOURCE }}
+cat > /opt/dvic-demo-watcher/config.json
+    "private_key_path": "/opt/dvic-demo-watcher/private.key"
+    "server_root_path": "{{ SERVER_ROOT_PATH }}"
+    "latest_install_source": "{{ UPDATE_SOURCE }}"
+}
 EOF
 
-cat /opt/dvic-demo-watcher/config.yml
+cat /opt/dvic-demo-watcher/config.json
 
 # Service installation
 cat > /etc/systemd/system/dvic_demo_watcher.service << EOF

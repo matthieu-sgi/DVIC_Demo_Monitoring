@@ -87,7 +87,7 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
         print(pck.node_status)
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", type=str)
     parser.add_argument("--exec", type=str, default="/bin/bash")
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.join and args.target:
-        print("CAnnot join and launch")
+        print("Cannot join and launch")
         exit(1)
 
     if args.local:
@@ -112,3 +112,6 @@ if __name__ == '__main__':
             cli.launch_interactive_session(args.target, args.exec, True)
         else:
             cli.join_interactive_session(args.join, True)
+
+if __name__ == '__main__':
+    main()
