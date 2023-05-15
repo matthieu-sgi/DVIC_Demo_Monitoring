@@ -7,26 +7,37 @@ from queue import Empty
 import subprocess
 import traceback
 import atexit
+from dataclasses import dataclass
 from typing import NoReturn
 from client.network.packets import Packet, decode as decode_packet, PacketInteractiveSession
 from threading import Thread
 
 from websocket import create_connection, WebSocket
 import logging
+import requests
 from client.interactive_session import InteractiveSession
 from client.meta import AbstractDVICNode
-from client.utils.crypto import CryptPhonebook
+from client.utils.crypto import CryptPhonebook, CryptClient
 
 DEFAULT_UID = "1d1f0545-2b60-488e-9419-d54b23bda47d" #fixed for testing TODO: read from config.
 DEFAULT_ENDPOINT = 'wss://dvic.devinci.fr/demo_control/ws/'
+
+@dataclass
+class ClientConfig():
+    uid: str
+    private_key_path: str
+    server_root_path: str
+    latest_install_source: str
+    preauth_source: str
 
 class DVICClient(AbstractDVICNode, CryptPhonebook):
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
     def __init__(self):        
         super().__init__()
         self.send_queue = Queue()
-        self.config = {} # read config
+        self.config: ClientConfig = None
         self.interactive_sessions: dict[str, InteractiveSession] = {}
+        self.read_config()
 
 
     def read_config(self):
@@ -34,29 +45,37 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
             uid: {{ NODE_UID }}
             private_key_path: /opt/dvic-demo-watcher/private.key
             server_root_path: {{ SERVER_ROOT_PATH }}
+            preauth_source: {{ PREAUTH_SOURCE }}
             latest_install_source: {{ UPDATE_SOURCE }}
         """ 
-        pass # TODO 
+        try:
+            with open('config.json') as fh:
+                self.config = ClientConfig(**json.loads(fh.read()))
+                print("[STARTUP] Config loaded")
+        except: 
+            traceback.print_exc()
+            print("[STARTUP] Config not loaded")
 
-    def get_public_key(self,  uid: str) -> str: 
-        return None
-    
+    def get_public_key(self,  uid: str) -> str: return None # client only needs private key
     def get_client_salt(self, _: str) -> str: return None
     def set_client_salt(self, uid: str, salt: str) -> None: return
-
 
     def _craft_auth_token(self): 
         if not self.is_secure_auth_enabled():
             print(f'[AUTH] Bypassing auth')
             return self.uid
         
-        # Preauth here
-        raise NotImplementedError()
-        #TODO 
+        cc = CryptClient(private_key=self.config.private_key_path)
+        p_answer = requests.get(f'{self.config.preauth_source}{self.uid}').json()
+        if not 'preauth_key' in p_answer:
+            print(f"[CONNECTION] Pre-auth failed: {p_answer}")
+            return None
+        token = cc.craft_initial_token(self.uid, p_answer['preauth_key'])
+        print(f'[CONNECTION] Attempting login with token {token}')
+        return token
 
     def _send_thread_target(self):
         try:
-            print("Starting send thread") #FIXME remove
             while True:
                 pck: Packet = self.send_queue.get(True)
                 self.ws.send(pck.encode())
@@ -67,7 +86,7 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
 
     @property
     def uid(self) -> str:
-        return os.environ.get('DVIC_MACHINE_UID') or DEFAULT_UID
+        return self.config.uid if self.config else os.environ.get('DVIC_MACHINE_UID') or DEFAULT_UID
 
     @property
     def url(self) -> str:
@@ -101,7 +120,6 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
     #     logging.info(f"[CONNECTION] Connected to {self.url}")
 
     def _recpt_thread_target(self):
-        print('Receiving...') #FIXME remove
         while True:
             try:
                 data = self.ws.recv()

@@ -2,32 +2,71 @@ import argparse
 import os
 import traceback
 import uuid
+import requests
 
 from threading import Thread
 from multiprocessing import Queue
+from dvic_demo_cli.utils.crypto import CryptClient
 from dvic_demo_cli.interactive_session import InteractiveSession
 from dvic_demo_cli.meta import DVICDemoWatcherCliBase
 from dvic_demo_cli.network.packets import *
 from websocket import create_connection, WebSocket
 
 DEFAULT_ENDPOINT = 'wss://dvic.devinci.fr/demo_control/ws/'
+DEFAULT_UID = "510e447a-fb45-45f0-9269-ea401e5faab3"
+
+DEFAULT_CONFIG_LOCATION = "~/.dvic/demo_watcher_cli_config.json"
+
+@dataclass
+class CliConfig:
+    private_key: str
+    uid: str
+    preauth_source: str
+    ws_url: str
 
 class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
-    def __init__(self) -> None:
+    def __init__(self, cfg_location: str) -> None:
         super().__init__()
-        self.uid = os.environ.get("DEMO_WATCHER_UID") or str(uuid.uuid4())
+        self.uid = os.environ.get("DEMO_WATCHER_UID") or DEFAULT_UID
         self.send_queue = Queue()
         self.sessions: dict[str, InteractiveSession] = {}
-        print(f'[STARTUP] Connection to {self.url}')
-        self.ws: WebSocket = create_connection(self.url)
+        self.config: CliConfig = None
+        self.load_config(cfg_location)
+        self.connect()
+
+        
+    def load_config(self, location: str):
+        with open(location) as fh:
+            self.config = CliConfig(**json.loads(fh.read()))
+        print('[STARTUP] Config loaded')
+
+
+    def connect(self):
+        # 1. preauth
+        print(f'[CONNECTION] Preauth')
+        cc = CryptClient(private_key=self.config.private_key)
+        p_answer = requests.get(f'{self.config.preauth_source}{self.uid}').json()
+        if not 'preauth_key' in p_answer:
+            print(f"[CONNECTION] Pre-auth failed: {p_answer}")
+            return None
+        token = cc.craft_initial_token(self.uid, p_answer['preauth_key'])
+
+        # 2. ws creation
+        print(f'[CONNECTION] Connection to {self.url}')
+        self.ws: WebSocket = create_connection(f'{self.url}{token}')
+
+        # 3. Start threads
         Thread(target=self._packet_reception_thread_target, daemon=True).start()
         Thread(target=self._packet_send_thread_target, daemon=True).start()
 
+
+
     @property
     def url(self) -> str:
-        base = os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
+        # base = os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
+        base = self.config.ws_url
         if not base.endswith('/'): base = f'{base}/'
-        return f'{base}{self.uid}' #FIXME use crypto
+        return f'{base}'
 
     def __enter__(self):
         return self
@@ -91,18 +130,19 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", type=str)
     parser.add_argument("--exec", type=str, default="/bin/bash")
-    parser.add_argument("--local", "-l", action="store_true")
+    # parser.add_argument("--local", "-l", action="store_true")
     parser.add_argument("--join", type=str)
+    parser.add_argument("--config", "-c", type=str, default=DEFAULT_CONFIG_LOCATION)
     args = parser.parse_args()
 
     if args.join and args.target:
         print("Cannot join and launch")
         exit(1)
 
-    if args.local:
-        os.environ['WEBSOCKET_URL'] = "ws://127.0.0.1:8000/ws"
+    # if args.local:
+    #     os.environ['WEBSOCKET_URL'] = "ws://127.0.0.1:8000/ws"
 
-    cli = DVICDemoWatcherCli()
+    cli = DVICDemoWatcherCli(args.config)
     with cli:
 
         cli.request_node_list()

@@ -19,9 +19,11 @@ cat > /opt/dvic-demo-watcher/private.key << EOF
 EOF
 
 cat > /opt/dvic-demo-watcher/config.json
-    "private_key_path": "/opt/dvic-demo-watcher/private.key"
-    "server_root_path": "{{ SERVER_ROOT_PATH }}"
-    "latest_install_source": "{{ UPDATE_SOURCE }}"
+{
+    "private_key_path": "/opt/dvic-demo-watcher/private.key",
+    "server_root_path": "{{ SERVER_ROOT_PATH }}",
+    "latest_install_source": "{{ UPDATE_SOURCE }}",
+    "preauth_source": {{ PREAUTH_SOURCE }}
 }
 EOF
 

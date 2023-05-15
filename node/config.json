@@ -1,0 +1,7 @@
+{
+    "uid":  "1d1f0545-2b60-488e-9419-d54b23bda47d",
+    "private_key_path": "../testing/client1.private",
+    "server_root_path":  "ws://127.0.0.1:8000/ws/",
+    "preauth_source":  "http://127.0.0.1:8000/preauth/",
+    "latest_install_source":  "UPDATE_SOURCE"
+}

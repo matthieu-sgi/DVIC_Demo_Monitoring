@@ -5,7 +5,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 import asyncio
 import os
-
+import json
+from pathlib import Path
+from dataclasses import dataclass
 
 from dvic_log_server.meta import AConnection
 from dvic_log_server.network.packets import Packet, PacketNodeAdditionRequest, decode as decode_packet
@@ -17,21 +19,26 @@ from dvic_log_server.logs import info, warning, error, debug
 
 app = FastAPI()
 
+@dataclass
+class ServerConfig():
+    server_private_key_path: str  #? not using double auth, so server private key is not used at the moment. Would be a nice to have
+    keys_save_path: str = "./keys"
+
 @singleton
 class ConnectionManager(CryptPhonebook):
     def __init__(self):
+        self.config = None
         self.connections: dict[str, AConnection] = {}
         self.log_path = os.path.dirname(os.path.realpath(__file__))
         #remove the 'dvic_log_server' part of the path
         self.log_path = self.log_path[:self.log_path.rfind('/')]
+        self.load_config()
+        self.salt_dic = {}
         if not self.is_secure_auth_enabled():
             self.private_key_path = None
             warning(f'The API is configured to IGNORE cryptographic client authentication. DO NOT do this in a production setting.')
     
-    def __setitem__(self, uid: str, connection: AConnection) -> None:
-        if connection is None:
-            pass #TODO trigger disconnection 
-        
+    def __setitem__(self, uid: str, connection: AConnection) -> None:    
         if uid in self.connections:
             if connection is not None:
                 debug(f'[{uid}] Replacing connection')
@@ -47,18 +54,32 @@ class ConnectionManager(CryptPhonebook):
             return
         self.connections[uid] = connection
 
+    def load_config(self):
+        if not os.path.isfile("config.json"):
+            with open("config.json", 'w+') as fh:
+                fh.write(ServerConfig())
+        try:
+            with open("config.json") as fh:
+                self.config = ServerConfig(**json.loads(fh.read()))
+            info("Config loaded")
+        except:
+            traceback.print_exc()
+            error('Failed to load server config')
+
     def get_public_key(self, uid: str) -> str:
-        return "" #TODO return public key
+        pkp = Path(self.config.keys_save_path, uid)
+        if not pkp.exists(): return None
+        return pkp.read_text()
 
     def __getitem__(self, uid: str) -> AConnection:
         if uid not in self.connections: return None
         return self.connections[uid]
     
     def get_client_salt(self, uid: str) -> str:
-        return super().get_client_salt(uid) #TODO
+        return self.salt_dic[uid]
     
     def set_client_salt(self, uid: str, salt: str) -> None:
-        return super().set_client_salt(uid, salt) #TODO
+        self.salt_dic[uid] = salt
     
     # def add_node_addition_request(self, source_node_uid: str, hostname: str, )
 
@@ -80,30 +101,23 @@ class ConnectionManager(CryptPhonebook):
 
 #     pass
 
-@app.get('/install_script/uid_node={uid}')
-def installer_script(uid : str):
-    """
-    Returns the installer script for the node.
-
-    ---------
-    args:
-        uid: the UID of the node installer
-        target_ip: the IP of the node that will be installed
-
-    """
-    path = f'./dvic_log_server/utils/install_script.sh'
-    file_content = ''
-    with open(path, 'r') as f:
-        file_content = f.read()
-    
-        
-
-
-    interactive_session = ScriptInteractiveSession(uid = uid,
-                                                    target_machine = target_ip,
-                                                    script_content = file_content)
-
-    interactive_session.run_script()           
+# @app.get('/install_script/uid_node={uid}')
+# def installer_script(uid : str):
+#     """
+#     Returns the installer script for the node.
+#     ---------
+#     args:
+#         uid: the UID of the node installer
+#         target_ip: the IP of the node that will be installed
+#     """
+#     path = f'./dvic_log_server/utils/install_script.sh'
+#     file_content = ''
+#     with open(path, 'r') as f:
+#         file_content = f.read()
+#     interactive_session = ScriptInteractiveSession(uid = uid,
+#                                                     target_machine = target_ip,
+#                                                     script_content = file_content)
+#     interactive_session.run_script()           
 
 
     
@@ -111,10 +125,14 @@ def installer_script(uid : str):
 
 @app.get('/preauth/{uid}')
 def get_salt(uid):
-    cm = ConnectionManager()
+    cm: CryptPhonebook = ConnectionManager()
     if not cm.is_secure_auth_enabled():
         debug(f'[AUTH] Ignore pre auth')
         return {'message': 'Pre-auth is disabled'}
+    if cm.get_public_key(uid) is None:
+        warning(f"[AUTH] Rejected preauth for {uid} (no such UID)")
+        return {'message': 'UID unknown'}
+    
     salt = CryptClient.get_salt()
     cm.set_client_salt(uid, salt)
     info(f'[AUTH] Preauth for {uid}: {salt}')
@@ -123,13 +141,14 @@ def get_salt(uid):
     
 @app.websocket("/ws/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str):
-    cry = CryptClient()
-    uid, packet_ok = cry.verify_initial_packet(token, ConnectionManager())
+    cm = ConnectionManager()
+    cry = CryptClient(private_key = cm.config.server_private_key_path)
+    uid, packet_ok = cry.verify_initial_packet(token, cm)
 
     await websocket.accept()
     if not packet_ok or False: #FIXME testing
-        info(f'[CONNECTION] ({uid}) ({websocket.client.host}) Connection token rejected')
-        websocket.send_text(f'Connection token rejected.')
+        warning(f'[CONNECTION] ({uid}) ({websocket.client.host}) Connection token rejected')
+        await websocket.send_text(f'Connection token rejected.')
         await websocket.close()
         return
 

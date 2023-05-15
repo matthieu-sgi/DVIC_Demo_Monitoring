@@ -74,7 +74,7 @@ class CryptClient():
     def craft_initial_token(self, uid: str, salt: str):
         self._raise_if_disabled()
         plaintext = f'{uid}{salt}'
-        signature = client.encode_b64_for_url(self.sign(plaintext))
+        signature = self.encode_b64_for_url(self.sign(plaintext))
         return f'{plaintext}{signature}'
     
     def verify_initial_packet(self, pck: str, phone_book: CryptPhonebook) -> tuple[str, bool]:
@@ -82,7 +82,10 @@ class CryptClient():
         uid = plaintext[:UUID_LEN]
         if not phone_book.is_secure_auth_enabled():
             return uid, True
-        key = VerifyingKey.from_pem(self._read_key(phone_book.get_public_key(uid)))
+        pk = phone_book.get_public_key(uid)
+        if pk is None:
+            return uid, False
+        key = VerifyingKey.from_pem(self._read_key(pk))
         exst = plaintext[UUID_LEN:UUID_LEN+SALT_LEN]
         return uid, self.verify(key, plaintext, self.decode_b64_from_url(signature)) and exst == phone_book.get_client_salt(uid)
     

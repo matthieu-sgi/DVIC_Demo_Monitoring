@@ -1,0 +1,7 @@
+{
+    "private_key": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIBn5QH/zaSDR89EVWBG3W5LwJKEOdQKlIgT4umaoypLioAoGCCqGSM49\nAwEHoUQDQgAEYi/BczzrT7I5quVHF67ICtsC1iukOrzr2y/1UF28Rxq/3tC5ocqh\nfTLuQ3jEflc61+2mbA+U/NNO+8J0gwPILw==\n-----END EC PRIVATE KEY-----", 
+    "uid": "510e447a-fb45-45f0-9269-ea401e5faab3",
+    "preauth_source": "http://127.0.0.1:8000/preauth/",
+    "ws_url": "ws://127.0.0.1:8000/ws/"
+}
+
