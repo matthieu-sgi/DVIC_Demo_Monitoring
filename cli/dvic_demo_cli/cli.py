@@ -60,7 +60,6 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
         Thread(target=self._packet_send_thread_target, daemon=True).start()
 
 
-
     @property
     def url(self) -> str:
         # base = os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
@@ -105,7 +104,7 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
         if block: session.wait()
 
     def launch_interactive_session(self, target_machine: str, exec: str, block: bool):
-        session = InteractiveSession(self, target_machine, exec)
+        session = InteractiveSession(client = self, target_machine = target_machine, executable = exec)
         self.sessions[session.uuid] = session
         session.launch()
         if block: session.wait()

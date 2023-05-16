@@ -42,7 +42,7 @@ class InteractiveSession:
         Thread(target=self.run, daemon=True).start()
 
     def run(self) -> int:
-        logging.info(f'[SESSION] Starting session {self.uid} with cmd {self.target_executable}')
+        print(f'[SESSION] Session {self.uid} has cmd {self.target_executable}')
         msg = None # termination message
         try:
             master, slave = pty.openpty() # ptty for session handling

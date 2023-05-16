@@ -126,7 +126,7 @@ class InteractiveSession:
                 return
 
             # create interactive session, this sends the initial packet
-            session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine])
+            session = InteractiveSession(pck.uuid, api.ConnectionManager()[pck.target_machine], target_executable=pck.executable)
             InteractiveSession._init_interactive_session(session)
             # subscribe sender
             session.subscribe(src)

@@ -18,12 +18,14 @@ cat > /opt/dvic-demo-watcher/private.key << EOF
 {{ PRIVATE_KEY }}
 EOF
 
-cat > /opt/dvic-demo-watcher/config.json
+cat > /opt/dvic-demo-watcher/config.json << EOF
 {
+    "uid": "{{ UID }},
     "private_key_path": "/opt/dvic-demo-watcher/private.key",
     "server_root_path": "{{ SERVER_ROOT_PATH }}",
-    "latest_install_source": "{{ UPDATE_SOURCE }}",
     "preauth_source": {{ PREAUTH_SOURCE }}
+    "latest_install_source": "{{ UPDATE_SOURCE }}",
+    
 }
 EOF
 
@@ -37,7 +39,7 @@ After=network.target
 Requires=network.target
 Type=simple
 Restart=always
-ExecStart=/opt/dvic-demo-watcher/dvic_client.py
+ExecStart=/opt/dvic-demo-watcher/main.py
 EOF
 
 

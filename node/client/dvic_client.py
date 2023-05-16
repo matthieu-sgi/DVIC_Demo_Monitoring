@@ -14,6 +14,7 @@ from threading import Thread
 
 from websocket import create_connection, WebSocket
 import logging
+from pathlib import Path
 import requests
 from client.interactive_session import InteractiveSession
 from client.meta import AbstractDVICNode
@@ -30,17 +31,21 @@ class ClientConfig():
     latest_install_source: str
     preauth_source: str
 
+    def __str__(self):
+        p = Path(self.private_key_path)
+        return f'uid={self.uid}\nserver_root={self.server_root_path}\nprivate_key={self.private_key_path} exists={p.exists()}\npreauth_source={self.preauth_source}'
+
 class DVICClient(AbstractDVICNode, CryptPhonebook):
     '''Client for the DVIC log server. Run as system service on the DVIC node.'''
-    def __init__(self):        
+    def __init__(self, config_file: str):        
         super().__init__()
         self.send_queue = Queue()
         self.config: ClientConfig = None
         self.interactive_sessions: dict[str, InteractiveSession] = {}
-        self.read_config()
+        self.read_config(config_file)
 
 
-    def read_config(self):
+    def read_config(self, config_file: str):
         """
             uid: {{ NODE_UID }}
             private_key_path: /opt/dvic-demo-watcher/private.key
@@ -49,9 +54,12 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
             latest_install_source: {{ UPDATE_SOURCE }}
         """ 
         try:
-            with open('config.json') as fh:
-                self.config = ClientConfig(**json.loads(fh.read()))
-                print("[STARTUP] Config loaded")
+            cfg = Path(config_file)
+            if not cfg.exists(): raise RuntimeError(f'Config file {config_file} does not exist')
+            self.config = ClientConfig(**json.loads(cfg.read_bytes()))
+            print("[STARTUP] Config loaded")
+            print(f"[STARTUP] Config:\n{self.config}")
+
         except: 
             traceback.print_exc()
             print("[STARTUP] Config not loaded")
@@ -90,7 +98,7 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
 
     @property
     def url(self) -> str:
-        base = os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
+        base = self.config.server_root_path or os.environ.get('WEBSOCKET_URL') or DEFAULT_ENDPOINT
         if not base.endswith('/'): base = f'{base}/'
         return f'{base}'
 
@@ -101,23 +109,32 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
         try: getattr(self, f'_handle_{pck.identifier}')(pck)
         except: traceback.print_exc()
 
-    def exit_handler(self):
+    def teardown(self):
         self.ws.close()
 
-    def run(self) -> NoReturn:
+
+    def run(self) -> None:
         auth_token = self._craft_auth_token()
         url = self.url + auth_token
         print(f'[STARTUP] Connection to {url}')
         self.ws: WebSocket = create_connection(url)
         print(f'[STARTUP] Connected')
         
-        atexit.register(self.exit_handler)
-        Thread(target=self._send_thread_target,  daemon=True).start()
-        Thread(target=self._recpt_thread_target, daemon=True).start()
-        input() #TODO local console?
+        # TODO moveatexit.register(self.exit_handler)
+        self.send_thread = Thread(target=self._send_thread_target,  daemon=True)
+        self.recp_thread = Thread(target=self._recpt_thread_target, daemon=True)
+        
+        self.send_thread.start()
+        self.recp_thread.start()
 
-    # def on_open(self, ws: WebSocketApp):
-    #     logging.info(f"[CONNECTION] Connected to {self.url}")
+        from time import sleep
+        while True:
+            sleep(1)
+            if not self.ws.connected:
+                print("[CONNECTION] Disconnected")
+                break
+
+
 
     def _recpt_thread_target(self):
         while True:
@@ -155,9 +172,6 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
         if uid in self.interactive_sessions:
             del self.interactive_sessions[uid]
 
-    #TODO @Matthieu implement the rest of the handlers
-   
-
     def execute_shell_command(self, command: str) -> None:
         '''Execute a shell command on the DVIC node.'''
         print(f'Executing shell command: {command}') 
@@ -165,10 +179,3 @@ class DVICClient(AbstractDVICNode, CryptPhonebook):
         with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
         self.create_json_message('shell_command_response', {'stdout': stdout.decode('utf-8'), 'stderr': stderr.decode('utf-8')}) # send packet directly with return uid 
-
-
-
-if __name__ == '__main__':
-    print(f'[STARTUP] Starting DVIC Demo Watcher Node')
-    client = DVICClient()
-    client.run()
