@@ -45,14 +45,17 @@ EOF
 
 # Update can be done with SSHSCript later
 # Only the initial install is required here
-# push & run installer.py #? installer.py or updater.py?
+# The initial package download is very simple
+# {{ DOWNLOAD_KEY }} is a one time use key to download the package
+# The update script is the scritp in updater.py 
 
 cat > /opt/dvic-demo-watcher/updater.py << EOF
-{{ UPDATER_SCRIPT_CONTENT }}
+{{ UPDATER_SCRIPT }}
 EOF
 
+
 # with set -e is the script fails the installation is marked as unsuccessful
-python3 /opt/dvic-demo-watcher/updater.py
+python3 /opt/dvic-demo-watcher/updater.py {{ DOWNLOAD_KEY }}
 
 systemctl daemon-reload
 systemctl enable dvic_demo_watcher

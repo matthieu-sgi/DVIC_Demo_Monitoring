@@ -9,8 +9,8 @@ The node functions are described in the [general readme](../README.md)
 # To DO
 
 - [ ] Auto-update python script
-- [ ] Send back the result of a command
-- [ ] Is the node alive ?
+- [x] Send back the result of a command
+- [x] Is the node alive ?
 
 # Tests
 
@@ -21,3 +21,12 @@ Then, you can run the tests with the following command:
 source tests/exports.sh
 make test
 ```
+
+# Updater
+
+Updating the software is done from the central server:
+
+- Launch update script
+- Script downloads the update from a given source
+- Script overrides current version
+- SCript restarts the software

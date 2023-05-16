@@ -1,45 +1,45 @@
 #!/bin/env python3
-from tqdm import tqdm
 import os
-import sys
-import requests
+import argparse
 import subprocess
 import tarfile
-import yaml
-import os
+import json
+
+from tqdm import tqdm
+import requests
 
 TEMP_DOWNLOAD_PATH = '/tmp/dvic_monitor_latest.zip'
-CONFIG_FILE = './config.yml'
+CONFIG_FILE = 'config.json'
 SERVICE_NAME = 'dvic_demo_watcher.service'
 
 class Installer:
 
-    def __init__(self) -> None:
+    def __init__(self, key: str) -> None:
         self.config = self.load_config()
+        self.key = key
 
     def load_config(self):
         with open(CONFIG_FILE, 'r') as fh:
-            return yaml.safe_load(fh)
+            return json.loads(fh.read())
 
     @property
     def update_url(self):
-        return self.config['latest_update_source']
+        return os.path.join(self.config['latest_update_source'], self.key)
     
-    def restart_service(): #! Maybe this will be done by using interactive session
-        try :
-            subprocess.run(['systemctl', 'restart', SERVICE_NAME])
+    # def restart_service():
+    #     try :
+    #         subprocess.run(['systemctl', 'restart', SERVICE_NAME])
         
-        except OSError as e:
-            print(e)
-            print('Failed to restart service. Please restart manually.')
+    #     except OSError as e:
+    #         print(e)
+    #         print('Failed to restart service. Please restart manually.')
         
-        except Exception as e:
-            print(e)
-            print('Failed to restart service. Please restart manually.')
+    #     except Exception as e:
+    #         print(e)
+    #         print('Failed to restart service. Please restart manually.')
 
 
     def install(self):
-
         print("[INSTALL] System Update Start")
         if os.path.isfile(TEMP_DOWNLOAD_PATH):
             os.unlink(TEMP_DOWNLOAD_PATH)
@@ -58,9 +58,14 @@ class Installer:
                         fh.write(chunk)
 
         print("[INSTALL] Extracting Asset")
-        tar = tarfile.open(TEMP_DOWNLOAD_PATH, "r:bz2")  
+        tar = tarfile.open(TEMP_DOWNLOAD_PATH, "r:bz2")
         tar.extractall("./")
         tar.close()
 
 if __name__ == '__main__':
-    Installer().install()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-k', '--key', required=True)
+
+    args = parser.parse_args()
+
+    Installer(args.key).install()
