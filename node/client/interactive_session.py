@@ -1,21 +1,20 @@
-from threading import Thread
-from subprocess import Popen
-import subprocess
 import os
 import pty
-from typing import NoReturn
 import traceback
 
-import logging
+from threading import Thread
+from subprocess import Popen
+from typing import NoReturn
 from client.meta import AbstractDVICNode
-
 from client.network.packets import PacketInteractiveSession
+
 
 class InteractiveSession:
     def __init__(self, target: str, uid: str, client: AbstractDVICNode) -> None:
         self.target_executable: str = target
         self.uid = uid # global IS UID as seen on API
         self.input_buffer = os.pipe()
+        self.process_obj = None
         
         self.client: AbstractDVICNode = client
         self.running = True
@@ -52,10 +51,10 @@ class InteractiveSession:
             self.process_obj.wait() # wait here for process termination
         except Exception as e:
             traceback.print_exc()
-            msg = f'Exception {type(e)} in session: {str(e)}'
+            msg = f'[NODE] Exception {type(e)} in session: {str(e)}'
 
         # Process exited, teardown the session
-        rt = self.process_obj.returncode
+        rt = self.process_obj.returncode if self.process_obj is not None else -1
         print(f'[SESSION] Session {self.uid} terminated with code {rt}')
         self.running = False
         self._send_termination(rt, msg)

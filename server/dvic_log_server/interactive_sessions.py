@@ -100,7 +100,6 @@ class InteractiveSession:
     def _init_interactive_session(session: "InteractiveSession"):
         global INTERACTIVE_SESSIONS
         INTERACTIVE_SESSIONS[session.uid] = session
-        print('registered')
         session.info(f'Registered session')
 
     @staticmethod
@@ -191,6 +190,7 @@ class ScriptInteractiveSession(InteractiveSession):
             self.info(f'Pushing script on console')
             for line in self.script_content.split('\n'):
                 self.push_line(line)
+            self.push_line("exit 0") #normal exit script line FIXME: does not stop if sub calls made catch the exit
 
 
 class SSHScriptInteractiveSession(ScriptInteractiveSession):

@@ -120,6 +120,8 @@ class DVICDemoWatcherCli(DVICDemoWatcherCliBase):
         if uuid in self.sessions:
             if self.sessions[uuid].receive_packet(pck):
                 del self.sessions[uuid]
+        else: #TODO: the session did not originate from this client. We can display the line and maybe send bytes for one session at a time.
+            print(pck.value.decode('utf-8'), end="", flush=True) #FIXME multi session handlign should come here
 
     def _handle_packet_node_status(self, pck: PacketNodeStatus):
         print(pck.node_status)
@@ -131,6 +133,7 @@ def main():
     parser.add_argument("--exec", type=str, default="/bin/bash")
     # parser.add_argument("--local", "-l", action="store_true")
     parser.add_argument("--join", type=str)
+    parser.add_argument("--script", type=str)
     parser.add_argument("--config", "-c", type=str, default=DEFAULT_CONFIG_LOCATION)
     args = parser.parse_args()
 
@@ -144,10 +147,15 @@ def main():
     cli = DVICDemoWatcherCli(args.config)
     with cli:
 
-        cli.request_node_list()
+        # cli.request_node_list()
         # input()    
+        from pathlib import Path
+        if args.script:
+            script = Path(args.script).read_text()
+            cli.send_packet(PacketScriptInteractiveSession(script, [args.target]))
+            input()
 
-        if args.target:
+        elif args.target:
             cli.launch_interactive_session(args.target, args.exec, True)
         else:
             cli.join_interactive_session(args.join, True)

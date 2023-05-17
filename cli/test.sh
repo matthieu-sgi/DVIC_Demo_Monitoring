@@ -1,0 +1,3 @@
+hostnamectl
+ip a
+

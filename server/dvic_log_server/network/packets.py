@@ -16,7 +16,8 @@ PACKET_ID_MATCHING = {
     "machine_log" : "MachineLog",
     "interactive_session": "InteractiveSession",
     "node_status": "NodeStatus",
-    "node_addition_request": "NodeAdditionRequest"
+    "node_addition_request": "NodeAdditionRequest",
+    "script_interactive_session": "ScriptInteractiveSession"
 } # identifier -> str(class<Packet>)
 
 @dataclass
@@ -263,6 +264,22 @@ class PacketInteractiveSession(Packet):
         self.target_machine = data['target_machine'] if 'target_machine' in data else None
         self.action = data['action'] if 'action' in data else None
 
+class PacketScriptInteractiveSession(Packet):
+    def __init__(self, script: str = None, targets: list[str] = None) -> None:
+        super().__init__("script_interactive_session")
+        self.script = script
+        self.targets = targets
+
+    def get_data(self) -> dict:
+        return  {
+            "script": self._encode_str(self.script),
+            "targets": self.targets
+        }
+    
+    def set_data(self, data: dict) -> None:
+        self.script = self._decode_str(data['script'])
+        self.targets = data['targets']
+        
 
 def decode(source: str) -> Packet:
     """Decodes a Packet from a str representation

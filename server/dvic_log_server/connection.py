@@ -6,9 +6,8 @@ from dvic_log_server.api import ConnectionManager
 from multiprocessing import Queue
 from dvic_log_server.logs import info, warning, error, debug
 from dvic_log_server.database_drivers import ElasticConnector
-from dvic_log_server.interactive_sessions import SSHScriptInteractiveSession
 from dvic_log_server.meta import AConnection
-from dvic_log_server.interactive_sessions import InteractiveSession 
+from dvic_log_server.interactive_sessions import InteractiveSession, ScriptInteractiveSession, SSHScriptInteractiveSession
 
 from time import time
 from starlette.websockets import WebSocketState
@@ -111,6 +110,19 @@ class Connection(AConnection):
     def _handle_interactive_session(self, pck: PacketInteractiveSession):
         InteractiveSession.handle_packet(self, pck)
     
+    def _handle_script_interactive_session(self, pck: PacketScriptInteractiveSession):
+        info(f"[SESSION] Initiating script sessions on {pck.targets}")
+        for m in pck.targets:
+            c = ConnectionManager()[m]
+            if c is None: 
+                error(f"[SESSION] Cannot start script session on {m}: machine not connected")
+                self.send_packet(PacketInteractiveSession(None, None, f'[SERVER] Cannot start script session on {m}: machine not connected', -1))
+                continue # TODO send message to client: no such machine, but no IS is started 
+            interactive_session = ScriptInteractiveSession(uid = None, target_machine=c, script_content=pck.script, script_exec_method=ScriptInteractiveSession.SCRIPT_EXEC_PUSH)
+            interactive_session.subscribe(self)
+            interactive_session.run_script()
+
+
     def _handle_log_entry(self, pck: PacketLogEntry):
         '''Handle a log entry packet'''
         elk = ElasticConnector(elk_host,elk_port,index='machine_logs')
@@ -135,10 +147,10 @@ class Connection(AConnection):
         
         def post_install_hook(session: SSHScriptInteractiveSession, return_value: int, message: str):
             if return_value == 0:
-                # ok, new node install successful
+                #TODO  ok, new node install successful
                 pass
             else:
-                # not ok, new node did not install, disregard the generated node id+ key
+                #TODO not ok, new node did not install, disregard the generated node id+ key
                 pass
 
         specific_script = "" #TODO install script parsed with the template and new node uid, private key are replaced
